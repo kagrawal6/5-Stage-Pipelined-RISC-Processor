@@ -1,0 +1,230 @@
+/filespace/v/vduggirala/552/Final_Project_v1/cpu.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/cpu.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module cpu
+
+Top level modules:
+	cpu
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/MetaDataArray.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/MetaDataArray.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module MetaDataArray
+-- Compiling module MBlock
+-- Compiling module MCell
+
+Top level modules:
+	MetaDataArray
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/Rotater.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/Rotater.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module Rotater
+
+Top level modules:
+	Rotater
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/pc_control.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/pc_control.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module pc_control
+
+Top level modules:
+	pc_control
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/cache_miss_handler.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/cache_miss_handler.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module cache_miss_handler
+
+Top level modules:
+	cache_miss_handler
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/pldff.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/pldff.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module pldff
+
+Top level modules:
+	pldff
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/I_cache.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/I_cache.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module I_cache
+
+Top level modules:
+	I_cache
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/decoder_6_64.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/decoder_6_64.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module decoder_6_64
+
+Top level modules:
+	decoder_6_64
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/Shifter.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/Shifter.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module Shifter
+
+Top level modules:
+	Shifter
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/register.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/register.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module Register
+
+Top level modules:
+	Register
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/cache_memory_bridge.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/cache_memory_bridge.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module cache_memory_bridge
+
+Top level modules:
+	cache_memory_bridge
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/dff.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/dff.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module dff
+
+Top level modules:
+	dff
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/CLA_16b.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/CLA_16b.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module CLA_16b
+
+Top level modules:
+	CLA_16b
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/Adder_ALU.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/Adder_ALU.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module Adder_ALU
+
+Top level modules:
+	Adder_ALU
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/XOR.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/XOR.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module XOR
+
+Top level modules:
+	XOR
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/write_decoder_4_16.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/write_decoder_4_16.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module write_decoder_4_16
+
+Top level modules:
+	write_decoder_4_16
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/Subtractor.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/Subtractor.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module Subtractor
+
+Top level modules:
+	Subtractor
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/PSA_16bit.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/PSA_16bit.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module PSA_16bit
+
+Top level modules:
+	PSA_16bit
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/DataArray.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/DataArray.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module DataArray
+-- Compiling module Block
+-- Compiling module DWord
+-- Compiling module DCell
+
+Top level modules:
+	DataArray
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/read_decoder_4_16.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/read_decoder_4_16.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module read_decoder_4_16
+
+Top level modules:
+	read_decoder_4_16
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/ALU.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/ALU.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module ALU
+
+Top level modules:
+	ALU
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/RED.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/RED.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module RED
+
+Top level modules:
+	RED
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/unified_memory.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/unified_memory.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module unified_memory
+
+Top level modules:
+	unified_memory
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/register_file.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/register_file.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module RegisterFile
+
+Top level modules:
+	RegisterFile
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/project-phase3-testbench.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/project-phase3-testbench.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module cpu_ptb
+
+Top level modules:
+	cpu_ptb
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/CLA_4b.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/CLA_4b.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module CLA_4b
+
+Top level modules:
+	CLA_4b
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/bit_cell.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/bit_cell.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module BitCell
+
+Top level modules:
+	BitCell
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/Shifter_ALU.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/Shifter_ALU.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module Shifter_ALU
+
+Top level modules:
+	Shifter_ALU
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/EX_MEM_Register.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/EX_MEM_Register.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module EX_MEM_Register
+
+Top level modules:
+	EX_MEM_Register
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/controlsignal.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/controlsignal.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module ControlSignal
+
+Top level modules:
+	ControlSignal
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/D_cache.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/D_cache.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module D_cache
+
+Top level modules:
+	D_cache
+
+} {} {}} /filespace/v/vduggirala/552/Final_Project_v1/decoder_3_8.v {1 {vlog -work work_cuurent -vopt -stats=none /filespace/v/vduggirala/552/Final_Project_v1/decoder_3_8.v
+QuestaSim vlog 2023.2_1 Compiler 2023.05 May 12 2023
+-- Compiling module decoder_3_8
+
+Top level modules:
+	decoder_3_8
+
+} {} {}}

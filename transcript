@@ -1,0 +1,239 @@
+# //  Questa Sim
+# //  Version 2023.2_1 linux May 12 2023
+# //
+# //  Copyright 1991-2023 Mentor Graphics Corporation
+# //  All Rights Reserved.
+# //
+# //  QuestaSim and its associated documentation contain trade
+# //  secrets and commercial or financial information that are the property of
+# //  Mentor Graphics Corporation and are privileged, confidential,
+# //  and exempt from disclosure under the Freedom of Information Act,
+# //  5 U.S.C. Section 552. Furthermore, this information
+# //  is prohibited from disclosure under the Trade Secrets Act,
+# //  18 U.S.C. Section 1905.
+# //
+# OpenFile Final_Project.mpf
+# Loading project Final_Project
+# Compile of project-phase3-testbench.v was successful.
+vsim -voptargs=+acc work.cpu_ptb
+# vsim -voptargs="+acc" work.cpu_ptb 
+# Start time: 19:07:22 on May 02,2025
+# ** Note: (vsim-8009) Loading existing optimized design _opt1
+# Loading work.cpu_ptb(fast)
+# Loading work.cpu(fast)
+# Loading work.dff(fast)
+# Loading work.CLA_16b(fast)
+# Loading work.unified_memory(fast)
+# Loading work.I_cache(fast)
+# Loading work.decoder_6_64(fast)
+# Loading work.MetaDataArray(fast)
+# Loading work.decoder_3_8(fast)
+# Loading work.pldff(fast)
+# Loading work.DataArray(fast)
+# Loading work.D_cache(fast)
+# Loading work.cache_memory_bridge(fast)
+# Loading work.cache_miss_handler(fast)
+# Loading work.pldff(fast__1)
+# Loading work.pldff(fast__2)
+# Loading work.memory4c(fast)
+# Loading work.pc_control(fast)
+# Loading work.ControlSignal(fast)
+# Loading work.RegisterFile(fast)
+# Loading work.read_decoder_4_16(fast)
+# Loading work.write_decoder_4_16(fast)
+# Loading work.pldff(fast__3)
+# Loading work.pldff(fast__4)
+# Loading work.ALU(fast)
+# Loading work.Adder_ALU(fast)
+# Loading work.Subtractor(fast)
+# Loading work.XOR(fast)
+# Loading work.PSA_16bit(fast)
+# Loading work.RED(fast)
+# Loading work.CLA_4b(fast)
+# Loading work.Shifter_ALU(fast)
+# Loading work.Shifter(fast)
+# Loading work.Rotater(fast)
+# Loading work.EX_MEM_Register(fast)
+# Loading work.MBlock(fast)
+# Loading work.Block(fast)
+# Loading work.Register(fast)
+# Loading work.MCell(fast)
+# Loading work.DWord(fast)
+# Loading work.BitCell(fast)
+# Loading work.DCell(fast)
+add wave -position insertpoint sim:/cpu_ptb/DUT/*
+run -all
+# Hello world...simulation starting
+# See verilogsim.plog and verilogsim.ptrace for output
+# ** Note: $finish    : /filespace/v/vduggirala/552/Final_Project_v1/project-phase3-testbench.v(157)
+#    Time: 4305 ns  Iteration: 0  Instance: /cpu_ptb
+# 1
+# Break in Module cpu_ptb at /filespace/v/vduggirala/552/Final_Project_v1/project-phase3-testbench.v line 157
+# Compile of memory4c.v was successful.
+restart
+# Closing VCD file "dump.vcd"
+# ** Note: (vsim-12125) Error and warning message counts have been reset to '0' because of 'restart'.
+# ** Note: (vsim-3813) Design is being optimized due to module recompilation...
+# ** Warning: (vopt-10587) Some optimizations are turned off because the +acc switch is in effect. This will cause your simulation to run slowly. Please use -access/-debug to maintain needed visibility.
+# ** Note: (vsim-12126) Error and warning message counts have been restored: Errors=0, Warnings=1.
+# Loading work.cpu_ptb(fast)
+# Loading work.cpu(fast)
+# Loading work.dff(fast)
+# Loading work.CLA_16b(fast)
+# Loading work.unified_memory(fast)
+# Loading work.I_cache(fast)
+# Loading work.decoder_6_64(fast)
+# Loading work.MetaDataArray(fast)
+# Loading work.decoder_3_8(fast)
+# Loading work.pldff(fast)
+# Loading work.DataArray(fast)
+# Loading work.D_cache(fast)
+# Loading work.cache_memory_bridge(fast)
+# Loading work.cache_miss_handler(fast)
+# Loading work.pldff(fast__1)
+# Loading work.pldff(fast__2)
+# Loading work.memory4c(fast)
+# Loading work.pc_control(fast)
+# Loading work.ControlSignal(fast)
+# Loading work.RegisterFile(fast)
+# Loading work.read_decoder_4_16(fast)
+# Loading work.write_decoder_4_16(fast)
+# Loading work.pldff(fast__3)
+# Loading work.pldff(fast__4)
+# Loading work.ALU(fast)
+# Loading work.Adder_ALU(fast)
+# Loading work.Subtractor(fast)
+# Loading work.XOR(fast)
+# Loading work.PSA_16bit(fast)
+# Loading work.RED(fast)
+# Loading work.CLA_4b(fast)
+# Loading work.Shifter_ALU(fast)
+# Loading work.Shifter(fast)
+# Loading work.Rotater(fast)
+# Loading work.EX_MEM_Register(fast)
+# Loading work.MBlock(fast)
+# Loading work.Block(fast)
+# Loading work.Register(fast)
+# Loading work.MCell(fast)
+# Loading work.DWord(fast)
+# Loading work.BitCell(fast)
+# Loading work.DCell(fast)
+run -all
+# Hello world...simulation starting
+# See verilogsim.plog and verilogsim.ptrace for output
+# ** Note: $finish    : /filespace/v/vduggirala/552/Final_Project_v1/project-phase3-testbench.v(157)
+#    Time: 5305 ns  Iteration: 0  Instance: /cpu_ptb
+# 1
+# Break in Module cpu_ptb at /filespace/v/vduggirala/552/Final_Project_v1/project-phase3-testbench.v line 157
+# Compile of memory4c.v was successful.
+restart
+# Closing VCD file "dump.vcd"
+# ** Note: (vsim-12125) Error and warning message counts have been reset to '0' because of 'restart'.
+# ** Note: (vsim-3813) Design is being optimized due to module recompilation...
+# ** Warning: (vopt-10587) Some optimizations are turned off because the +acc switch is in effect. This will cause your simulation to run slowly. Please use -access/-debug to maintain needed visibility.
+# ** Note: (vsim-12126) Error and warning message counts have been restored: Errors=0, Warnings=1.
+# Loading work.cpu_ptb(fast)
+# Loading work.cpu(fast)
+# Loading work.dff(fast)
+# Loading work.CLA_16b(fast)
+# Loading work.unified_memory(fast)
+# Loading work.I_cache(fast)
+# Loading work.decoder_6_64(fast)
+# Loading work.MetaDataArray(fast)
+# Loading work.decoder_3_8(fast)
+# Loading work.pldff(fast)
+# Loading work.DataArray(fast)
+# Loading work.D_cache(fast)
+# Loading work.cache_memory_bridge(fast)
+# Loading work.cache_miss_handler(fast)
+# Loading work.pldff(fast__1)
+# Loading work.pldff(fast__2)
+# Loading work.memory4c(fast)
+# Loading work.pc_control(fast)
+# Loading work.ControlSignal(fast)
+# Loading work.RegisterFile(fast)
+# Loading work.read_decoder_4_16(fast)
+# Loading work.write_decoder_4_16(fast)
+# Loading work.pldff(fast__3)
+# Loading work.pldff(fast__4)
+# Loading work.ALU(fast)
+# Loading work.Adder_ALU(fast)
+# Loading work.Subtractor(fast)
+# Loading work.XOR(fast)
+# Loading work.PSA_16bit(fast)
+# Loading work.RED(fast)
+# Loading work.CLA_4b(fast)
+# Loading work.Shifter_ALU(fast)
+# Loading work.Shifter(fast)
+# Loading work.Rotater(fast)
+# Loading work.EX_MEM_Register(fast)
+# Loading work.MBlock(fast)
+# Loading work.Block(fast)
+# Loading work.Register(fast)
+# Loading work.MCell(fast)
+# Loading work.DWord(fast)
+# Loading work.BitCell(fast)
+# Loading work.DCell(fast)
+run -all
+# Hello world...simulation starting
+# See verilogsim.plog and verilogsim.ptrace for output
+# ** Note: $finish    : /filespace/v/vduggirala/552/Final_Project_v1/project-phase3-testbench.v(157)
+#    Time: 5405 ns  Iteration: 0  Instance: /cpu_ptb
+# 1
+# Break in Module cpu_ptb at /filespace/v/vduggirala/552/Final_Project_v1/project-phase3-testbench.v line 157
+# Compile of memory4c.v was successful.
+restart
+# Closing VCD file "dump.vcd"
+# ** Note: (vsim-12125) Error and warning message counts have been reset to '0' because of 'restart'.
+# ** Note: (vsim-3813) Design is being optimized due to module recompilation...
+# ** Warning: (vopt-10587) Some optimizations are turned off because the +acc switch is in effect. This will cause your simulation to run slowly. Please use -access/-debug to maintain needed visibility.
+# ** Note: (vsim-12126) Error and warning message counts have been restored: Errors=0, Warnings=1.
+# Loading work.cpu_ptb(fast)
+# Loading work.cpu(fast)
+# Loading work.dff(fast)
+# Loading work.CLA_16b(fast)
+# Loading work.unified_memory(fast)
+# Loading work.I_cache(fast)
+# Loading work.decoder_6_64(fast)
+# Loading work.MetaDataArray(fast)
+# Loading work.decoder_3_8(fast)
+# Loading work.pldff(fast)
+# Loading work.DataArray(fast)
+# Loading work.D_cache(fast)
+# Loading work.cache_memory_bridge(fast)
+# Loading work.cache_miss_handler(fast)
+# Loading work.pldff(fast__1)
+# Loading work.pldff(fast__2)
+# Loading work.memory4c(fast)
+# Loading work.pc_control(fast)
+# Loading work.ControlSignal(fast)
+# Loading work.RegisterFile(fast)
+# Loading work.read_decoder_4_16(fast)
+# Loading work.write_decoder_4_16(fast)
+# Loading work.pldff(fast__3)
+# Loading work.pldff(fast__4)
+# Loading work.ALU(fast)
+# Loading work.Adder_ALU(fast)
+# Loading work.Subtractor(fast)
+# Loading work.XOR(fast)
+# Loading work.PSA_16bit(fast)
+# Loading work.RED(fast)
+# Loading work.CLA_4b(fast)
+# Loading work.Shifter_ALU(fast)
+# Loading work.Shifter(fast)
+# Loading work.Rotater(fast)
+# Loading work.EX_MEM_Register(fast)
+# Loading work.MBlock(fast)
+# Loading work.Block(fast)
+# Loading work.Register(fast)
+# Loading work.MCell(fast)
+# Loading work.DWord(fast)
+# Loading work.BitCell(fast)
+# Loading work.DCell(fast)
+run -all
+# Hello world...simulation starting
+# See verilogsim.plog and verilogsim.ptrace for output
+# ** Note: $finish    : /filespace/v/vduggirala/552/Final_Project_v1/project-phase3-testbench.v(157)
+#    Time: 36405 ns  Iteration: 0  Instance: /cpu_ptb
+# 1
+# Break in Module cpu_ptb at /filespace/v/vduggirala/552/Final_Project_v1/project-phase3-testbench.v line 157
