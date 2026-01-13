@@ -75,4 +75,10 @@ The following documents describe the design and specification of the processor:
 - Final Project Report RISC V.pdf — Design explanation and validation results
 
 
+## Reference Material
 
+Course Lectures
+https://youtube.com/playlist?list=PLYPFPSvBJgaeS8NVVMlmt_w24vUaWGI2C&si=G_H_8zdJ1Gowo0VY
+
+Textbook
+Computer Organization and Design by David A. Patterson and John L. Hennessy
