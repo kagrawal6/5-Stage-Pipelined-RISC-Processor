@@ -32,6 +32,7 @@ The design was verified using the provided testbenches, memory images, and wavef
 The top-level module is `cpu.v`.
 
 
+
 ## Repository Structure
 
 ```text
@@ -43,6 +44,7 @@ The top-level module is `cpu.v`.
 ├── Project-Description.pdf
 └── README.md
 ```
+
 
 
 ## project_working_directory
@@ -61,6 +63,7 @@ This folder contains all files required to simulate and build the processor. The
 
 ### Quartus and ModelSim Project Files
 - `.mpf` and `.mti` files for ModelSim and Quartus project configuration
+
 
 
 ## Documentation
