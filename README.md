@@ -2,7 +2,6 @@
 
 This repository contains a complete hardware implementation of the WISC-S25 16-bit RISC processor developed for ECE/CS 552 (Introduction to Computer Architecture). The design implements a five-stage pipelined CPU with instruction and data caches and supports the full WISC-S25 instruction set.
 
----
 
 ## Overview
 
@@ -37,19 +36,19 @@ The design was verified using the provided testbenches, memory images, and wavef
 
 The top-level module is `cpu.v`.
 
----
 
 ## Repository Structure
 
+```text
+.
 ├── project_working_directory/
-│ └── Complete Verilog, testbenches, memory images, and simulator projects
+│   └── Complete Verilog, testbenches, memory images, and simulator projects
 ├── Final Project Report RISC V.pdf
 ├── RISC_CPU_Block_Diagram.pdf
 ├── Project-Description.pdf
 └── README.md
+```
 
-
----
 
 ## project_working_directory
 
@@ -68,7 +67,6 @@ This folder contains all files required to simulate and build the processor. The
 ### Quartus and ModelSim Project Files
 - `.mpf` and `.mti` files for ModelSim and Quartus project configuration
 
----
 
 ## Documentation
 
