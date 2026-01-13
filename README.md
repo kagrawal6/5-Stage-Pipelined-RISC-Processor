@@ -1,10 +1,5 @@
 # WISC-S25 RISC Processor — Verilog Implementation
 
-This repository contains a complete hardware implementation of the WISC-S25 16-bit RISC processor developed for ECE/CS 552 (Introduction to Computer Architecture). The design implements a five-stage pipelined CPU with instruction and data caches and supports the full WISC-S25 instruction set.
-
-
-## Overview
-
 This project implements a complete **16-bit WISC-S25 RISC processor** in Verilog, developed for ECE/CS 552 (Introduction to Computer Architecture). The design evolves from a single-cycle CPU into a fully **five-stage pipelined processor with instruction and data caches**, implementing all architectural and microarchitectural requirements defined in the course specification.
 
 The processor supports the full **WISC-S25 instruction set**, including:
