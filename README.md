@@ -152,9 +152,9 @@ Clock period in the testbench is **100 time units** (50-unit half-period). Reset
 
 The following documents describe the design and specification of the processor:
 
-- Project-Description.pdf — Official WISC-S25 ISA, pipeline, and cache specifications
-- RISC_CPU_Block_Diagram.pdf — Datapath, pipeline, and cache block diagram
-- Final Project Report RISC V.pdf — Design explanation and validation results
+- [Project-Description.pdf](Project-Description.pdf) — Official WISC-S25 ISA, pipeline, and cache specifications
+- [RISC_CPU_Block_Diagram.pdf](RISC_CPU_Block_Diagram.pdf) — Datapath, pipeline, and cache block diagram
+- [Final Project Report RISC V.pdf](Final%20Project%20Report%20RISC%20V.pdf) — Design explanation and validation results
 
 
 ## Reference Material
