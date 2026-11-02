@@ -38,6 +38,7 @@ The top-level module is `cpu.v`.
 ```text
 .
 ├── README.md                           This file
+├── PROJECT_DESCRIPTION.md              Detailed description of both cores (diagrams, timing, results)
 ├── project_working_directory/          Phase-3 five-stage pipeline: RTL, tests, simulator files
 │   └── README.md                       File map and design overview
 ├── ooo_core/                           Out-of-order extension of the same processor
@@ -174,6 +175,8 @@ Clock period in the testbench is **100 time units** (50-unit half-period). Reset
 ## Documentation
 
 The following documents describe the design and specification of the processor:
+
+- [PROJECT_DESCRIPTION.md](PROJECT_DESCRIPTION.md) — Detailed description of both implemented cores (five-stage and out-of-order), with block diagrams, timing, verification, and results
 
 - [Project-Description.pdf](Project-Description.pdf) — Official WISC-S25 ISA, pipeline, and cache specifications
 - [RISC_CPU_Block_Diagram.pdf](RISC_CPU_Block_Diagram.pdf) — Datapath, pipeline, and cache block diagram
