@@ -15,8 +15,9 @@ Both cores run the same WISC-S25 programs. A Python golden model checks the out-
 instruction by instruction. On the programs the five-stage core runs correctly, the out-of-order
 core is 1.60x faster (geometric mean).
 
-Diagrams are plain text so they render everywhere. A few flowcharts use Mermaid; GitHub renders
-those automatically.
+Diagrams are plain-text figures so they render on GitHub, in the editor, and in PDF exports.
+Each figure has a short caption that says what to look at, then the surrounding text walks
+through the same picture.
 
 ## Contents
 
@@ -43,26 +44,27 @@ those automatically.
 
 ## Instruction formats
 
+Every instruction is 16 bits. Bit 15 is on the left. The 4-bit opcode in `[15:12]` picks the
+row; the remaining fields are the operands.
+
 ```text
-  15     12 11      8 7       4 3       0
- +---------+---------+---------+---------+
- | opcode  |   rd    |   rs    |   rt    |   ADD SUB XOR RED PADDSB      (register-register)
- +---------+---------+---------+---------+
- | opcode  |   rd    |   rs    |  imm4   |   SLL SRA ROR                 (imm4 = shift amount 0..15)
- +---------+---------+---------+---------+
- | opcode  |   rt    |   rs    |  off4   |   LW  (rt <- mem)   SW  (rt -> mem); off4 is signed, in words
- +---------+---------+---------+---------+
- | opcode  |   rd    |       imm8        |   LLB LHB
- +---------+------+--+-------------------+
- | opcode  | cond |        imm9          |   B    target = PC + 2 + (sext(imm9) << 1)
- +---------+------+--+---------+---------+
- | opcode  | cond | x|   rs    |  xxxx   |   BR   target = rs
- +---------+------+--+---------+---------+
- | opcode  |   rd    |     xxxxxxxx      |   PCS  rd = PC + 2
- +---------+---------+-------------------+
- |  1111   |          xxxxxxxxxxxx       |   HLT
- +---------+-----------------------------+
+  bit:     15          12 11          8 7           4 3           0
+           +-------------+-------------+-------------+-------------+
+  ALU rr   | opcode      | rd          | rs          | rt          |  ADD SUB XOR RED PADDSB
+  shift    | opcode      | rd          | rs          | imm4        |  SLL SRA ROR  (amount 0..15)
+  memory   | opcode      | rt          | rs          | off4        |  LW  rt <- M[addr]
+           |             |             |             |             |  SW  M[addr] <- rt
+           |             |             |             |             |  addr = (rs & ~1) + (off4 << 1)
+  byte     | opcode      | rd          | imm8                      |  LLB / LHB  (also read rd)
+           +-------------+------+------+---------------------------+
+  B        | opcode      | cond | imm9                             |  PC <- PC+2+(imm9<<1)
+  BR       | opcode      | cond |  x   | rs          | xxxx        |  PC <- rs
+  PCS      | opcode      | rd          | xxxxxxxxxxxxxxxxx         |  rd <- PC+2
+  HLT      | 1111        | xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx         |  stop
+           +-------------+-----------------------------------------+
 ```
+
+*Figure 0.1 — How to decode one word. Start at bits `[15:12]`, then read the matching row.*
 
 ## Instructions
 
@@ -110,10 +112,22 @@ and the golden model reproduces them.
 - **PADDSB.** Each 4-bit lane is added as two signed 4-bit numbers, and the result is clamped to
   `-8..7`.
 - **RED** (as built by `RED.v`):
-  - Each of the four nibble pairs `a[4i+3:4i] + b[4i+3:4i]` is added as unsigned 4-bit numbers,
-    giving a 5-bit result with the carry as bit 4.
-  - Each 5-bit result is read as a signed value.
-  - The four values are summed, and the 8-bit total is sign-extended to 16 bits.
+
+```text
+  a[15:12] + b[15:12]   a[11:8] + b[11:8]   a[7:4] + b[7:4]   a[3:0] + b[3:0]
+       unsigned 4+4          unsigned 4+4        unsigned 4+4      unsigned 4+4
+       = 5-bit signed        = 5-bit signed      = 5-bit signed    = 5-bit signed
+              \                    /                    \                /
+               +------------------+                      +--------------+
+                     8-bit sum                                8-bit sum
+                            \                                  /
+                             +--------------------------------+
+                                        8-bit sum
+                                   sign-extended to 16 bits
+```
+
+*Figure 0.2 — RED adder tree. Each nibble pair is added first; those four 5-bit signed
+values are then reduced to one 16-bit result.*
 - **Shifts** use the 4-bit immediate. `ROR` by 0 returns the input unchanged.
 
 ## Assembler conveniences
@@ -137,28 +151,37 @@ Source: `project_working_directory/`. Top level: `cpu.v`. Testbench: `cpu_ptb` i
 
 ## I.1 Overview
 
-```text
-                         branch taken: next_PC = target, flush the instruction in IF
-            +------------------------------------------------------------+
-            |                                                            |
-            v                                                            |
-       +---------+  IF/ID  +------------------+  ID/EX  +-------------+  EX/MEM  +-------------+  MEM/WB  +-----------+
-  PC ->|   IF    |-------->|       ID         |-------->|     EX      |--------->|     MEM     |--------->|    WB     |
-       | I-cache |         | ControlSignal    |         | ALU         |          | D-cache     |          | RF write  |
-       | PC + 2  |         | RegisterFile rd  |         | LLB/LHB     |          | LW / SW     |          | flag regs |
-       +---------+         | pc_control:      |         | address gen |          |             |          | (Z, N, V) |
-                           |  branch resolve  |         +-------------+          +-------------+          +-----------+
-                           +------------------+               ^    ^                 |      ^                  |
-                                  ^    ^                      |    |  EX/MEM -> EX   |      | MEM/WB -> MEM    |
-                                  |    |                      |    +-----------------+      | (store data)     |
-                                  |    |                      |          MEM/WB -> EX       |                  |
-                                  |    |                      +-----------------------------+------------------+
-                                  |    +-- register-file write-before-read bypass (WB -> ID) -----------------+
-                                  +------- flag bypass for branches (WB -> ID) --------------------------------+
+Walk left to right: one instruction occupies each box for one cycle, then moves to the next.
 
-       I-cache miss: PC holds, a NOP (0xE000 = PCS R0) is sent into ID.
-       D-cache miss: every pipeline register holds (the whole pipeline freezes).
+```text
+          IF/ID              ID/EX              EX/MEM             MEM/WB
+            |                  |                  |                  |
+            v                  v                  v                  v
+  +--------+    +--------+    +--------+    +--------+    +--------+
+  |  IF    |--->|  ID    |--->|  EX    |--->|  MEM   |--->|  WB    |---> architectural
+  | fetch  |    | decode |    | execute|    | memory |    | write  |    state
+  | I-cache|    | RF read|    | ALU /  |    | D-cache|    | RF, ZNV|
+  | PC + 2 |    | branch |    | LLB/LHB|    | LW, SW |    | hlt    |
+  +--------+    +--------+    +--------+    +--------+    +--------+
+       ^             |              ^              ^            |
+       |             |              |              |            |
+       |        taken branch        |         store data        |
+       |        redirects PC        |         from WB           |
+       |        and flushes IF      |              |            |
+       +----------------------------+              |            |
+                                    forwarding     |            |
+                                    (next figure)  +------------+
 ```
+
+*Figure I.1 — Five-stage pipeline. Branches are decided in ID (predict not-taken). A taken
+branch sends a new PC back to IF and kills the instruction already fetched behind it.*
+
+| If this happens | What the pipeline does |
+|---|---|
+| I-cache miss | PC holds. IF injects `0xE000` (`PCS R0`, a no-op) into ID. |
+| D-cache miss | Every pipeline register holds. The whole pipeline freezes. |
+| Taken branch in ID | PC becomes the target. The IF/ID register is cleared (one bubble). |
+| `HLT` in ID–WB | PC stops advancing so earlier instructions can finish. |
 
 **Register naming in `cpu.v`.** Signals are named after the pipeline register they come out of.
 For example, `ID_EX_*` is the decode stage's logic, which feeds the ID/EX register. In stage terms:
@@ -204,10 +227,23 @@ flags and produces the next PC:
 The policy is predict not-taken. A taken branch resets the IF/ID register, which squashes the one
 instruction fetched behind it, and redirects the PC. A taken branch therefore costs one bubble.
 
-**EX.** Forwarding muxes select each ALU operand from:
-- the ID/EX register;
-- the EX/MEM register (*EX→EX* forwarding);
-- the MEM/WB register (*MEM→EX* forwarding).
+**EX.** Each ALU operand is chosen by a forwarding mux. Read this figure from the right: the
+newest result that writes the needed register wins.
+
+```text
+  sources for one ALU operand (priority: newest first)
+
+     EX/MEM result  ---- EX -> EX ----+
+     (instr that was in EX last cycle)|
+                                      v
+     MEM/WB result  ---- MEM -> EX -->+--> operand mux --> ALU / address add
+     (instr that was in MEM last cycle)
+                                      ^
+     value from ID/EX  ---------------+
+     (no hazard; use the RF read)
+```
+
+*Figure I.2 — Operand forwarding into EX. The same mux exists for both ALU inputs.*
 
 The ALU (`ALU.v`) selects one of the arithmetic units (`ALUOp`). For loads and stores, the base is
 masked with `0xFFFE` and the offset shifted left by 1, and the ALU's ADD computes the address.
@@ -222,34 +258,61 @@ selected in hardware as opcodes with `op[3] = 0` and `op[1:0] != 11`. `hlt` is t
 
 ## I.3 Hazards
 
-| Hazard | Detection (in ID) | Resolution |
+Three kinds of problem, three kinds of fix: forward a value, stall a stage, or squash a fetch.
+
+**Data hazards** (a later instruction needs a register an earlier one is still producing):
+
+| Situation | How it is detected | Fix |
 |---|---|---|
-| ALU result needed by the next instruction | rd of the instruction in MEM = source in EX | EX/MEM → EX forwarding |
-| Result two instructions back | rd of the instruction in WB = source in EX | MEM/WB → EX forwarding |
-| Result being written this cycle | WB writes the register ID is reading | register-file write-before-read bypass |
-| Load followed by a dependent | instruction in EX is a load and its rd = a source in ID | stall IF/ID one cycle, then forward |
-| Load followed by a store of that value | load in WB, store in MEM, same register | MEM/WB → MEM forwarding (no stall) |
-| Branch needs flags still being computed | a flag-setting instruction is in EX or MEM, and the condition reads that flag | stall the branch in ID |
-| Branch needs flags being written now | a flag-setting instruction is in WB | flag bypass from WB |
-| `BR` needs a register still being computed | Rs = rd of the instruction in EX or MEM | stall in ID |
+| ALU result needed by the next instruction | rd in MEM = source in EX | EX/MEM → EX forwarding |
+| Result two instructions back | rd in WB = source in EX | MEM/WB → EX forwarding |
+| Result being written this cycle | WB writes the register ID is reading | RF write-before-read bypass |
+| Load, then a dependent ALU op | load in EX, its rd = a source in ID | stall IF/ID one cycle, then forward |
+| Load, then a store of that value | load in WB, store in MEM, same rt | MEM/WB → MEM forwarding (no stall) |
+
+**Control hazards** (a branch's outcome or target is not ready yet):
+
+| Situation | How it is detected | Fix |
+|---|---|---|
+| Branch needs flags still in EX or MEM | flag-setting op in EX/MEM, condition uses that flag | stall the branch in ID |
+| Branch needs flags being written now | flag-setting op in WB | flag bypass WB → ID |
+| `BR` needs a register still in EX or MEM | Rs = rd of the instruction in EX or MEM | stall in ID |
 | Taken branch | resolved in ID | flush the one fetched instruction (1 bubble) |
+
+**Memory stalls:**
+
+| Situation | Signal | Fix |
+|---|---|---|
 | I-cache miss | `instr_miss_stall` | hold PC, send a NOP into ID |
 | D-cache miss | `data_miss_stall` | freeze every pipeline register |
 
-Example timing (each column is a cycle):
+Pipeline timing. Each column is a clock cycle. Follow one instruction across a row.
 
 ```text
-                      c1   c2   c3   c4   c5   c6   c7
-ADD  R1, R2, R3       IF   ID   EX   MEM  WB
-SUB  R4, R1, R5            IF   ID   EX   MEM  WB             R1 forwarded EX/MEM -> EX in c4
+  ALU -> ALU  (no stall; EX/MEM forwards R1 into the SUB in cycle 4)
+                 c1    c2    c3    c4    c5    c6
+  ADD R1,R2,R3   IF    ID    EX    MEM   WB
+  SUB R4,R1,R5         IF    ID    EX    MEM   WB
+                                   ^
+                                   R1 from EX/MEM
 
-LW   R1, R2, 0        IF   ID   EX   MEM  WB
-ADD  R4, R1, R5            IF   ID   ID   EX   MEM  WB        load-use: one stall, then MEM/WB -> EX
+  Load-use  (one stall; MEM/WB then forwards R1 into the ADD in cycle 5)
+                 c1    c2    c3    c4    c5    c6    c7
+  LW  R1,R2,0    IF    ID    EX    MEM   WB
+  ADD R4,R1,R5         IF    ID    ID    EX    MEM   WB
+                                   stall ^
+                                         R1 from MEM/WB
 
-SUB  R0, R1, R2       IF   ID   EX   MEM  WB
-B    EQ, target            IF   ID   ID   ID                  stalls while SUB is in EX and MEM; resolves in c5 via the WB flag bypass
-<fall-through>                  IF   IF   IF                  held in IF during the stall; flushed if the branch is taken
+  Branch waits for flags  (stalls in ID until SUB reaches WB)
+                 c1    c2    c3    c4    c5    c6
+  SUB R0,R1,R2   IF    ID    EX    MEM   WB
+  B   EQ, tgt          IF    ID    ID    ID    EX ...
+  fall-through               IF    IF    IF    (flushed if taken)
+                                   stall stall
+                                         flags from WB
 ```
+
+*Figure I.3 — Three hazard cases. A stall repeats a stage name; a flush drops the fall-through.*
 
 ## I.4 Arithmetic units
 
@@ -281,29 +344,54 @@ missing.
 
 ## I.6 Memory hierarchy
 
+Two caches, one miss handler, one main-memory port. Follow a miss downward; follow a store-hit
+sideways.
+
 ```text
-                 +-----------------------------------------------------------------+
-                 |                        unified_memory.v                         |
-   PC ---------->|  I_cache.v   2 KB, 2-way, 64 sets x 8 words       instr -------->|--> IF
-                 |       |  miss                                                   |
-                 |       v                                                         |
-                 |  cache_memory_bridge.v  (arbiter: I-cache miss first)           |
-                 |       |            \                                            |
-                 |       v             \  SW hit: write-through                    |
-                 |  cache_miss_handler.v --> memory4c.v (64K x 16, 4-cycle read)   |
-                 |       ^                                                         |
-                 |       |  miss                                                   |
-   addr, data -->|  D_cache.v   2 KB, 2-way, write-through, write-allocate         |--> MEM
-                 +-----------------------------------------------------------------+
+  IF: PC ------------------+                              +--> instruction --> ID
+                           v                              |
+                      +----------+                        |
+                      | I-cache  |-- hit -----------------+
+                      | 2 KB     |
+                      +----+-----+
+                           | miss
+                           v
+                      +----------+     +------------------+     +-------------+
+                      | bridge   |---->| miss handler     |---->| memory4c    |
+                      | I first, |     | 8-word burst     |     | 64K x 16    |
+                      | then D   |     | start of line    |     | 4-cycle rd  |
+                      +----+-----+     +------------------+     +------+------+
+                           | miss                                      ^
+                           v                                           | SW hit:
+                      +----------+                                     | write-through
+                      | D-cache  |-- hit: LW data --> MEM              |
+                      | 2 KB     |-- hit: SW data ---------------------+
+                      | WT, WA   |
+                      +----------+
+                           ^
+  MEM: addr, store data ---+
 ```
+
+*Figure I.4 — Unified memory. Both caches miss through the same handler. A store that hits
+writes the D-cache and main memory in the same cycle.*
 
 **Cache organisation.** The I-cache and D-cache have the same structure: 2 KB, 2-way
 set-associative, 64 sets, 16-byte lines of eight 16-bit words.
 
 ```text
-  address:  | 15 ......... 10 | 9 ....... 4 | 3 ... 1 | 0 |
-            |   tag (6 bits)  | set (6 bits)| word (3)| x |
+  address bit:  15              10  9              4  3     1  0
+                +----------------+--+--------------+--+-----+--+
+                | tag (6)        |  | set (6)      |  | word|  |  always 0 (16-bit words)
+                +----------------+--+--------------+--+-----+--+
+                       |                |               |
+                       |                v               v
+                       |          64 sets            8 words / line
+                       v
+                compare against both ways' tags; valid+match = hit
+                miss: pick invalid way, else the LRU way
 ```
+
+*Figure I.5 — Cache address split. Set index `[9:4]` picks the row; tag `[15:10]` picks the way.*
 
 - `MetaDataArray.v` holds one byte per way and set: `{tag[5:0], valid, LRU}`.
 - `DataArray.v` holds 64 blocks × 8 words of `dff` cells.
@@ -319,11 +407,16 @@ cache word and main memory in the same cycle. A store miss first refills the lin
 **Miss handler** (`cache_miss_handler.v`). A 12-bit shift register tracks one refill:
 
 ```text
-  cycle (from first read): 0  1  2  3  4  5  6  7  8  9  10 11
-  memory read issued:      w0 w1 w2 w3 w4 w5 w6 w7
-  data returns:                        w0 w1 w2 w3 w4 w5 w6 w7   (memory4c: 4-cycle pipelined reads)
-  tag/valid written:                                         X
+  cycle after first read issued
+                   0    1    2    3    4    5    6    7    8    9   10   11
+  issue a read:   w0   w1   w2   w3   w4   w5   w6   w7
+  word returns:                       w0   w1   w2   w3   w4   w5   w6   w7
+  write into $:                       w0   w1   w2   w3   w4   w5   w6   w7
+  tag + valid:                                                                X
 ```
+
+*Figure I.6 — One line refill. Memory is pipelined, so eight reads can be in flight; each word
+comes back four cycles after it was requested. The line is usable only after the tag write.*
 
 The refill starts at the beginning of the line (`addr & 0xFFF0`). Counting the cycle in which the
 miss is detected, the pipeline stalls for about 13 cycles per miss.
@@ -395,65 +488,70 @@ Source: `ooo_core/rtl/`. Top level: `cpu.v`, with the same ports as the five-sta
   unchanged.
 - **Measurable**: every optimization is a parameter, so it can be turned off and compared.
 
-## II.2 Top-level block diagram
+## II.2 How an instruction moves through the core
+
+Six steps. Fetch, rename and commit are in-order and one-wide. Issue and execute are out of
+order, and up to four units can fire in the same cycle.
 
 ```text
- +-------------------------------- FRONT END (frontend.v) -------------------------------------+
- |                                                                                              |
- |  fetch_pc --> I-cache (2 KB 2-way) --> predecode --> next-PC select --> IFQ (4 entries)      |
- |     ^             |                      |  B: target = PC+2+imm   {pc, instr,               |
- |     |             | miss                 |  BR: BTB (16 entries)    predicted next PC,       |
- |     |             v                      v                          GHR snapshot}           |
- |     |        mem_system          direction predictor (BP_TYPE 0..6)        |                 |
- |     |                            + speculative 16-bit GHR                  |                 |
- +-----|-----------------------------------------------------------------------|-----------------+
-       | redirect (mispredict: PC, repaired GHR)                               v
-       |                                                  +---------------------------------------+
-       |                                                  | DECODE / RENAME / DISPATCH (cpu.v)    |
-       |                                                  |  decoder.v: FU class, sources, dests  |
-       |                                                  |  map table: R1..R15, Z, NV -> ROB tag |
-       |                                                  |  operand read: ARF / ROB / CDB        |
-       |                                                  |  PCS, HLT, B UNCOND, NOP: done here   |
-       |                                                  +---+----------------+-------------+----+
-       |                                                      | alloc          | insert      | alloc (SW)
-       |                                                      v                v             v
-       |   +--------------------------+     +-----------------------------+  +------------------+
-       |   | ROB (16)        rob.v    |     | ISSUE QUEUE (8) issue_queue |  | STORE QUEUE (8)  |
-       |   |  in-order commit         |     |  data capture, wakeup on    |  |  lsu.v           |
-       |   |  ARF R0..R15, flags Z N V|     |  CDB A/B, oldest-first      |  |  head | cmt | tail|
-       |   |  map-table rebuild on    |     |  select per FU class        |  +--------+---------+
-       |   |  recovery                |     +--+--------+--------+-----+--+           |  ^
-       |   +-----------+--------------+        |        |        |     |              |  |
-       |               ^                       v        v        v     v              |  |
-       |               |                     ALU      BRU      LDU    STU ------------+  |
-       +---------------|------------------------------ |        |      (addr+data)       |
-            recovery   |                     |         |        |  forward <-------------+
-                       |                     v         |        v                        |
-                       |                  CDB A        |      CDB B         drain at commit
-                       |             (value+Z/N/V)     |    (load value)   (write-through)
-                       +----- completion --+-----------+--------+                        |
-                                           |   wakeup to the IQ, ROB done bits           v
-                                                                     +--------------------------+
-                                                                     | D-cache (2 KB 2-way)     |
-                                                                     | mem_system.v: refill     |
-                                                                     | engine, prefetch, writes |
-                                                                     | memory4c (4-cycle reads) |
-                                                                     +--------------------------+
+  1. FETCH                2. RENAME               3. ISSUE
+  I-cache + predictor     decoder + map table     oldest ready instr
+  one instr / cycle       one instr / cycle       per FU class
+  into 4-entry IFQ        into ROB, IQ, SQ        (ALU, BRU, LDU, STU)
+         |                         |                       |
+         v                         v                       v
+  4. EXECUTE              5. WRITE-BACK           6. COMMIT
+  ALU / BRU / LDU / STU   CDB A: ALU + flags      ROB head, if done
+  one cycle each          CDB B: load value       writes ARF / flags
+         |                         |              trains predictor
+         |                         |              drains committed stores
+         +---- wakeup IQ ----------+
+         +---- mark ROB done ------+
+         +---- BRU may recover ----+
 ```
+
+*Figure II.1 — Instruction lifetime. Independent instructions can pass each other in step 3–4;
+step 6 puts them back into program order.*
+
+Where those steps live in the RTL:
+
+```text
+  fetch_pc --> I-cache --> predictor --> IFQ --1/cycle--> decode / rename / dispatch
+     ^           |                                         |         |          |
+     |           | miss                                    |         |          | SW
+     |           v                                         v         v          v
+     |      mem_system                                  ROB(16)   IQ(8)      SQ(8)
+     |      + I/D $                                     commit       |          |
+     |                                                  ARF, map     |          |
+     |                                                       ^       v          v
+     |                                                       |    ALU  BRU   LDU  STU
+     |                                  recovery <-----------+     |    |     |    |
+     |                                  (squash younger)           |    |     |    |
+     +----- redirect PC, GHR --------------------------------------+    |     |    |
+                                                                        v     v    v
+                                                                     CDB A  CDB B  drain
+                                                                     (ALU)  (load) to D$
+```
+
+*Figure II.2 — Block diagram. The left column is fetch and memory; the middle is rename and
+commit; the right is issue and execute.*
 
 ## II.3 Pipeline timing
 
-Each box is one clock cycle. An instruction's minimum path:
+Each box is one clock cycle. This is the shortest path (ALU, operands already ready):
 
 ```text
-  cycle    0          1              2                 3                  4
-        +-------+ +-----------+ +------------------+ +----------------+ +---------+
-        | FETCH | |  DECODE   | |  SELECT + EXECUTE| |  WRITE-BACK    | | COMMIT  |
-        | I$ +  | |  RENAME   | |  (IQ select, FU, | |  CDB valid:    | | ROB     |
-        | pred. | |  DISPATCH | |  D$ read for LW) | |  ROB done,     | | head    |
-        | ->IFQ | |  ->ROB/IQ | |                  | |  IQ wakeup     | | retires |
-        +-------+ +-----------+ +------------------+ +----------------+ +---------+
+  cycle      0              1                 2                  3               4
+         +--------+    +----------+    +---------------+    +---------+    +--------+
+         | FETCH  |    | DECODE   |    | SELECT+EXECUTE|    |  CDB    |    | COMMIT |
+         | I-cache|    | rename   |    | IQ pick + ALU |    | wakeup  |    | ROB    |
+         | predict|    | dispatch |    |               |    | ROB done|    | head   |
+         | -> IFQ |    | -> ROB IQ|    |               |    |         |    |        |
+         +--------+    +----------+    +---------------+    +---------+    +--------+
 ```
+
+*Figure II.3 — Best-case ALU path. A dependent ALU can issue in the cycle after its producer
+because the CDB is bypassed into IQ select.*
 
 | Event | Latency |
 |---|---|
@@ -469,18 +567,54 @@ Each box is one clock cycle. An instruction's minimum path:
 Each cycle the front end does the following:
 
 1. **Read** the I-cache at `fetch_pc`. On a miss, it raises `i_miss_req` and fetches nothing.
-2. **Predecode** the instruction bits to choose the next PC in the same cycle:
+2. **Predecode** the instruction bits and choose the next PC in the same cycle:
+
+```text
+  fetched word
+       |
+       +-- HLT? ------------ yes --> stop fetching until a redirect
+       |
+       +-- B UNCOND? ------- yes --> next PC = PC+2+(imm9<<1)     always taken
+       |
+       +-- B cond? --------- yes --> direction predictor
+       |                                taken  --> PC+2+(imm9<<1)
+       |                                not    --> PC+2
+       |
+       +-- BR? ------------- yes --> direction predictor (if cond)
+       |                                and BTB hit?
+       |                                yes --> next PC = BTB target
+       |                                no  --> PC+2
+       |
+       +-- anything else --------------> PC+2
+```
+
+*Figure II.4 — Next-PC decision in the fetch cycle. A correctly predicted taken `B` costs no
+bubble because the target is known from the instruction bits.*
 
    | Instruction | Predicted next PC |
    |---|---|
-   | `B UNCOND` | always the target `PC + 2 + (imm9 << 1)` |
-   | conditional `B` | the target if the direction predictor says taken, otherwise PC + 2 |
-   | `BR` | the BTB target, if the BTB hits and (the branch is unconditional or predicted taken); otherwise PC + 2 |
-   | `HLT` | fetch stops (`stopped`) until a redirect; the HLT might be on a wrong path |
+   | `B UNCOND` | always `PC + 2 + (imm9 << 1)` |
+   | conditional `B` | that target if the direction predictor says taken, else PC + 2 |
+   | `BR` | BTB target if the BTB hits and (unconditional, or predicted taken); else PC + 2 |
+   | `HLT` | fetch stops (`stopped`) until a redirect |
    | anything else | PC + 2 |
 
 3. **Update the GHR** speculatively. Every conditional branch shifts its predicted direction into
    the 16-bit global history register. Bit 0 is the newest.
+
+```text
+  GHR before this branch (saved in the IFQ / ROB):   h15 ... h1  h0
+  predicted taken = 1:
+  GHR after:                                         h14 ... h0   1
+                                                     newest ----------------^
+
+  On a mispredict the back end restores:
+      GHR <- {saved snapshot, actual taken bit}
+  so later predictions see the real history, not the wrong-path guess.
+```
+
+*Figure II.5 — Speculative GHR. The snapshot travels with the branch so recovery can repair it.*
+
 4. **Enqueue** `{pc, instr, predicted next PC, GHR before this branch}` into the 4-entry
    instruction fetch queue (IFQ). Fetch stalls when the IFQ is full.
 
@@ -507,35 +641,50 @@ predictor:
 | 5 | perceptron | 32 perceptrons × 13 weights × 8-bit | `PC[5:1]`; predict taken when y ≥ 0 |
 | 6 | **TAGE-lite** (default) | base 512 × 2b + 3 tagged tables × 128 entries | geometric histories of 4, 8 and 16 bits |
 
-**Tournament** (Alpha 21264 style):
+**Tournament** (Alpha 21264 style). Two experts, plus a chooser that learns which expert to trust:
 
 ```text
-                 +--> gshare PHT [PC ^ GHR] ----------------+
-   PC, GHR ------+                                          +--> MUX --> prediction
-                 +--> local history [PC] --> local PHT ------+     ^
-                                                                   |
-   GHR ---------------------------------> chooser [GHR] -----------+
-                      (trained toward whichever component was right when they disagreed)
+  PC, GHR --> gshare PHT [PC XOR GHR] ---- global guess --+
+                                                          |     chooser[GHR]
+  PC -------> local history[PC] --> local PHT             +--> picks one --> prediction
+                              local guess ----------------+
+
+  At commit: train both PHTs. If they disagreed, move the chooser toward the one that was right.
 ```
 
-**Perceptron** (Jiménez & Lin):
+*Figure II.6 — Tournament predictor. The chooser is indexed by global history, not by PC.*
+
+**Perceptron** (Jiménez & Lin). One weight per recent branch, plus a bias:
 
 ```text
-   y = w0 + sum over i = 0..11 of ( GHR[i] ? +w[i+1] : -w[i+1] )        predict taken if y >= 0
-   train at commit when the prediction was wrong or |y| <= theta (37):
-       w0 += taken ? +1 : -1;    w[i+1] += (taken == GHR[i]) ? +1 : -1     (8-bit saturating)
+  y = w0 + (GHR[0] ? +w1 : -w1) + ... + (GHR[11] ? +w12 : -w12)
+
+  y >= 0  --> predict taken
+  y <  0  --> predict not-taken
+
+  Train at commit if the guess was wrong, or if |y| was smaller than theta (37):
+      bump w0 toward the outcome
+      bump w[i+1] up if GHR[i] matched the outcome, down otherwise
 ```
 
-**TAGE-lite** (Seznec):
+*Figure II.7 — Perceptron. `PC[5:1]` selects which of 32 perceptrons to use.*
+
+**TAGE-lite** (Seznec). Longer history tables override shorter ones when their tag matches:
 
 ```text
-   PC ----------------------------------> base (bimodal, 512 x 2b) -----------+
-   PC, GHR[3:0]  --hash--> T1 (128): valid | tag(8) | ctr(3) | u(2) --tag?----+
-   PC, GHR[7:0]  --hash--> T2 (128)                                 --tag?----+--> provider = longest-history
-   PC, GHR[15:0] --hash--> T3 (128)                                 --tag?----+    table whose tag matches
+  PC              --> base bimodal (512 x 2-bit)     always a guess
+  PC, GHR[3:0]    --> T1  128 entries, tag+counter+u    hit?
+  PC, GHR[7:0]    --> T2  128 entries                   hit?
+  PC, GHR[15:0]   --> T3  128 entries                   hit?
 
-   index = PC[7:1] ^ PC[14:8] ^ fold7(history)        tag = PC[8:1] ^ fold8_rotated(history)
+  provider = the hitting table with the longest history (else the base)
+  alternate = the next-shorter hit (used to train the useful bit)
+
+  index = PC[7:1] XOR PC[14:8] XOR folded history
+  tag   = PC[8:1] XOR folded history (different fold)
 ```
+
+*Figure II.8 — TAGE-lite lookup. Walk T3, T2, T1, then the base; the first tag match wins.*
 
 TAGE-lite updates at commit as follows:
 1. **Provider.** The provider's counter moves toward the outcome. If no tagged table hit, the base
@@ -553,23 +702,30 @@ TAGE-lite updates at commit as follows:
 
 ## II.6 Decode, rename and dispatch
 
-**Decoder** (`decoder.v`). For each opcode the decoder determines the functional unit, the source
-registers, the flags read and the results written:
+**Decoder** (`decoder.v`). For each opcode: which unit runs it, what it reads, what it writes,
+and whether it even needs the issue queue.
 
-| Instruction | FU | Source 1 | Source 2 | Flags read | Writes | Enters the IQ |
-|---|---|---|---|---|---|---|
-| ADD, SUB | ALU | rs | rt | – | rd, Z, NV | yes |
-| XOR | ALU | rs | rt | – | rd, Z | yes |
-| RED, PADDSB | ALU | rs | rt | – | rd | yes |
-| SLL, SRA, ROR | ALU | rs | – | – | rd, Z | yes |
-| LLB, LHB | ALU | rd | – | – | rd | yes |
-| LW | LDU | rs (base) | – | – | rt | yes |
-| SW | STU | rs (base) | rt (data, bits 11:8) | – | memory | yes |
-| B (conditional) | BRU | – | – | per condition | – | yes |
-| B UNCOND | – | – | – | – | – | no: fetch already followed it |
-| BR | BRU | rs (target) | – | per condition | – | yes |
-| PCS | – | – | – | – | rd = PC + 2 | no: the value is known |
-| HLT | – | – | – | – | – | no |
+Compute:
+
+| Instruction | Unit | Reads | Writes | IQ? |
+|---|---|---|---|---|
+| ADD, SUB | ALU | rs, rt | rd, Z, NV | yes |
+| XOR | ALU | rs, rt | rd, Z | yes |
+| RED, PADDSB | ALU | rs, rt | rd | yes |
+| SLL, SRA, ROR | ALU | rs | rd, Z | yes |
+| LLB, LHB | ALU | rd | rd | yes |
+
+Memory and control:
+
+| Instruction | Unit | Reads | Writes | IQ? |
+|---|---|---|---|---|
+| LW | LDU | rs (base) | rt | yes |
+| SW | STU | rs (base), rt (data, bits 11:8) | memory | yes |
+| B cond | BRU | flags for that condition | – | yes |
+| B UNCOND | – | – | – | no (fetch already followed it) |
+| BR | BRU | rs (target), flags if cond | – | yes |
+| PCS | – | – | rd = PC + 2 | no (value known at dispatch) |
+| HLT | – | – | – | no |
 
 In addition, an ALU instruction with no architectural effect (`rd = R0` and no flags written,
 for example the `PADDSB R0,R0,R0` NOP) is completed at dispatch and never occupies the IQ.
@@ -578,15 +734,23 @@ for example the `PADDSB R0,R0,R0` NOP) is completed at dispatch and never occupi
 only Z, so a later branch on N doesn't have to wait for them.
 
 **Map table and operand read** (`rob.v`). Each of R1–R15, plus Z and NV, has a `busy` bit and the
-ROB tag of its youngest in-flight producer. For each source, dispatch takes the first of these
-that applies:
+ROB tag of its youngest in-flight producer. For each source, walk this list top to bottom and
+stop at the first match:
 
 ```text
-   not busy (or R0)            -> value from the architectural register file (ARF)
-   busy, producer done         -> value from the producer's ROB entry
-   busy, producer on CDB A/B   -> value from the result bus this cycle
-   otherwise                   -> not ready; wait for tag = producer's ROB index
+  source register (or Z / NV)
+           |
+           +-- R0, or map.busy = 0? ---- yes --> ARF value          ready
+           |
+           +-- producer ROB entry done?  yes --> ROB value          ready
+           |
+           +-- producer on CDB A or B?   yes --> CDB value          ready
+           |
+           +-- otherwise ----------------------> wait for that tag  not ready
 ```
+
+*Figure II.9 — Operand lookup at dispatch. The destination's map entry is then pointed at the
+new ROB slot.*
 
 The destination's map entry is then pointed at the new ROB entry.
 
@@ -618,11 +782,24 @@ The ROB is a 16-entry circular buffer (`ROB_W = 4`). Each entry holds:
 - trains the predictor or BTB;
 - marks stores committed in the store queue.
 
-**Recovery** squashes every entry younger than the branch (`rec_tag`). The age of an entry is
-`(tag - head) mod 16`. The tail moves to `rec_tag + 1`. The **map table is rebuilt**
-combinationally: for each register, the rebuilt map holds the youngest surviving entry that writes
-it, scanning from head to `rec_tag`. This replaces per-branch map checkpoints and costs one
-priority scan instead of 16 copies of the map.
+**Recovery** squashes every entry younger than the branch (`rec_tag`). Age is
+`(tag − head) mod 16`. Walk the picture left to right: everything to the right of the branch is
+wrong-path.
+
+```text
+  before:   [ older ... ] [ BRANCH ] [ younger ] [ younger ] [ younger ]
+            ^ head        ^ rec_tag                              ^ tail
+
+  after:    [ older ... ] [ BRANCH ]
+            ^ head        ^ rec_tag
+                          ^ new tail = rec_tag + 1
+
+  map table: scan surviving entries from head to rec_tag;
+             each register's tag becomes the youngest writer that is still alive
+```
+
+*Figure II.10 — ROB after a mispredict. No per-branch map checkpoints: the map is rebuilt from
+the entries that remain.*
 
 ## II.8 Issue queue (`issue_queue.v`)
 
@@ -633,17 +810,21 @@ operand values, not only tags. Each entry has:
   captured `value`.
 
 ```text
-   CDB A (ALU: value + Z,N,V) ---+---> compare with every waiting tag ---> capture value, set ready
-   CDB B (load: value)        ---+         (and bypass straight into this cycle's readiness)
-                                                         |
-                                                         v
-           ready[e] = valid & all four sources ready (or on a CDB now)
-                      & (not a load  or  (load unit free and no older store with unknown address))
-                                                         |
-                                                         v
-           for each FU class (ALU, BRU, LDU, STU): pick the ready entry with the smallest age
-           -> up to 4 instructions issue per cycle; their entries are freed
+  every cycle, for each IQ entry:
+
+    1. WAKEUP     CDB A (ALU value + Z,N,V)  --+--> if tag matches a waiting source,
+                  CDB B (load value)         --+    capture the value and set ready
+                                                (also used combinationally this cycle)
+
+    2. READY      all four sources ready (or arriving on a CDB now)
+                  and, if this is a load: LDU free and no older store still has an unknown address
+
+    3. SELECT     for ALU, for BRU, for LDU, for STU:
+                    among ready entries of that class, pick the smallest age
+                  up to four instructions issue; those IQ slots are freed
 ```
+
+*Figure II.11 — Issue-queue cycle. Age is distance from the ROB head, so older work goes first.*
 
 - **Select is oldest-first per class.** Age is the distance from the ROB head, so older
   instructions on the critical path go first.
@@ -651,49 +832,62 @@ operand values, not only tags. Each entry has:
 
 ## II.9 Execution units
 
-| Unit | Module | What it does | Result |
+| Unit | Module | Work | Where the result goes |
 |---|---|---|---|
-| ALU | `alu_unit` (`exec_units.v`) | instantiates the phase-3 `Adder_ALU`, `Subtractor`, `XOR`, `PSA_16bit`, `RED`, `Shifter_ALU`, and adds the LLB/LHB byte merge. Z = (result == 0), N = result[15], V = add/sub overflow | CDB A (registered) |
-| BRU | `branch_unit` | evaluates the condition, computes the real next PC (`PC+2`, `PC+2+imm`, or `Rs`), and compares it with the predicted next PC | ROB (taken, npc, mispredict); recovery |
-| AGU | in `cpu.v` | `(base & 0xFFFE) + (sext(off4) << 1)`, plain 16-bit wrap-around | to the LDU / STU |
-| LDU | `lsu.v` | store-queue forwarding or a D-cache read | CDB B (registered) |
-| STU | `lsu.v` | writes the address and data into the store's SQ entry, and marks the ROB entry done | – |
+| ALU | `alu_unit` | ADD/SUB/XOR/RED/PADDSB/shifts plus LLB/LHB, using the phase-3 arithmetic blocks. Z = (result == 0), N = result[15], V = add/sub overflow | CDB A next cycle |
+| BRU | `branch_unit` | evaluate the condition, compute the real next PC, compare with the prediction | ROB (taken, npc, mispredict); may start recovery |
+| AGU | in `cpu.v` | `(base & 0xFFFE) + (sext(off4) << 1)`, wrap-around add | LDU / STU this cycle |
+| LDU | `lsu.v` | SQ forwarding or D-cache read | CDB B next cycle |
+| STU | `lsu.v` | write address and data into the store's SQ entry | ROB marked done |
 
 Each unit takes one cycle. The ALU's flags are always computed; the ROB only commits the ones
 the instruction writes.
 
 ## II.10 Load/store unit (`lsu.v`)
 
-**Store queue** (8 entries, `SQ_W = 3`). Its pointers carry an extra wrap bit:
+**Store queue** (8 entries, `SQ_W = 3`). Pointers carry an extra wrap bit so full and empty are
+distinct. A store walks from right to left as it ages:
 
 ```text
-        sq_head            sq_cmt                      sq_tail
-           |                  |                           |
-   ... [ committed, waiting ][ speculative stores        ][ free ... ]
-         to drain to D$/mem    (squashed on recovery:
-                                tail := branch's sqp)
+  sq_head                 sq_cmt                      sq_tail
+     |                       |                           |
+     v                       v                           v
+  [ committed, waiting ]  [ speculative stores ]  [ free ... ]
+    drain to D-cache        squashed on recovery
+    and memory              (tail <- branch's saved sqp)
+
+  four steps, in order:
+    1. ALLOCATED at dispatch                         (tail advances)
+    2. RESOLVED when STU writes addr and data
+    3. COMMITTED when the store retires from the ROB (cmt advances)
+    4. DRAINED: written to D-cache and memory        (head advances)
 ```
 
-A store passes through four steps:
-1. It is *allocated* at dispatch.
-2. It is *resolved* when the STU writes its address and data.
-3. It is *committed* when it retires from the ROB.
-4. It is *drained*: written to the D-cache and memory in program order. The drain needs the head
-   store to hit in the D-cache and the memory port to be free. A drain miss triggers a refill
-   (write-allocate), and the store retries afterwards.
+*Figure II.12 — Store-queue lifetime. Drain needs a D-cache hit and a free memory port. A drain
+miss refills the line (write-allocate) and retries.*
 
-**Loads:**
+**Loads.** The IQ only issues a load once every older store has an address, so the load can
+compare against the queue safely:
 
-```mermaid
-flowchart TD
-    A[Load selected in IQ<br/>all older stores have addresses,<br/>load unit free] --> B{Older store in SQ<br/>to the same word?}
-    B -- yes --> C[Forward data from the<br/>youngest such store]
-    B -- no --> D{D-cache hit?<br/>includes words already<br/>arrived in a refill}
-    D -- yes --> E[Value on CDB B next cycle]
-    C --> E
-    D -- no --> F[Hold in the pending-load register,<br/>request a refill,<br/>block younger loads]
-    F --> D
+```text
+  load issues from IQ
+        |
+        v
+  older store to the same word? -- yes --> forward youngest match --+
+        | no                                                        |
+        v                                                           v
+  D-cache hit (including words     -- yes --> cache data -----------+--> CDB B next cycle
+  already written during a refill)
+        | no
+        v
+  hold in the pending-load register
+  request a refill; block younger loads
+        |
+        +---- retry when the missed word arrives
 ```
+
+*Figure II.13 — Load path. Forwarding uses the store queue; a miss occupies the load unit until
+the line (or, with early restart, the missed word) is back.*
 
 - **Memory disambiguation is conservative.** A load waits until every older store's address is
   known. It can then safely go ahead of older stores to other addresses (load bypassing), and it
@@ -704,25 +898,31 @@ flowchart TD
 
 ## II.11 Branch recovery
 
-`EARLY_RECOVERY = 1` (default) recovers when the BRU detects the mispredict:
+`EARLY_RECOVERY = 1` (default) recovers in the cycle the BRU sees `actual next PC != predicted`.
+Everything listed here happens in that same cycle:
 
-```mermaid
-sequenceDiagram
-    participant BRU
-    participant ROB
-    participant IQ
-    participant SQ
-    participant FE as Front end
-    BRU->>BRU: actual next PC != predicted next PC
-    BRU->>ROB: rec_tag = branch; tail := branch+1; rebuild map table
-    BRU->>IQ: clear entries younger than the branch
-    BRU->>SQ: tail := branch's saved sqp (drop younger stores)
-    BRU->>FE: redirect PC; GHR := {snapshot, actual outcome}; clear IFQ
-    Note over FE: correct-path fetch starts next cycle
+```text
+  BRU:  mispredict
+    |
+    +--> ROB     rec_tag = branch tag
+    |            new tail = rec_tag + 1          (drop younger ROB entries)
+    |            rebuild map from surviving entries
+    |
+    +--> IQ      drop entries younger than the branch
+    |
+    +--> SQ      tail = the branch's saved sqp   (drop younger stores)
+    |
+    +--> fetch   PC  = actual next PC
+                 GHR = {snapshot from the branch, actual taken bit}
+                 clear the IFQ
+                 start correct-path fetch next cycle
 ```
 
-`EARLY_RECOVERY = 0` performs the same actions when the mispredicted branch reaches the ROB head.
-At that point everything younger is wrong-path, so this is simpler, but slower.
+*Figure II.14 — Early recovery. Same actions with `EARLY_RECOVERY = 0`, but they wait until the
+branch is the ROB head.*
+
+With `EARLY_RECOVERY = 0` the same squash happens only when the branch reaches the ROB head.
+That is simpler (everything younger is already known to be wrong-path) but slower.
 
 ## II.12 Memory system (`cache.v`, `mem_system.v`)
 
@@ -736,26 +936,32 @@ tag bits [15:10], set bits [9:4]. One LRU bit per set gives true LRU for 2 ways.
   invalidated. Words are written as they arrive, and the line becomes valid at `fill_done`.
 
 **Refill engine.** One engine serves both caches. The memory port does at most one operation per
-cycle, in this priority order:
+cycle. Highest number that is ready wins:
+
+| Priority | Operation | When |
+|---|---|---|
+| 1 (highest) | D-cache demand miss | a load is waiting, or a store is draining to a missing line |
+| 2 | I-cache demand miss | fetch missed |
+| 3 | store write-through | also allowed once a refill has issued all 8 reads |
+| 4 | I-cache next-line prefetch | line after the one being fetched, absent, memory idle |
+| 5 (lowest) | D-cache next-line prefetch | line after the last D demand miss, absent, memory idle |
+
+A refill issues 8 back-to-back word reads. With `EARLY_RESTART`, it starts at the missed word
+(here word 5 of the line) and wraps around:
 
 ```text
-   1. D-cache demand miss   (a waiting load or a store being drained)
-   2. I-cache demand miss
-   3. store write-through   (also allowed in the last cycles of a refill, see below)
-   4. I-cache next-line prefetch  (line after the one being fetched, if absent and memory idle)
-   5. D-cache next-line prefetch  (line after the last D-cache demand miss)
+  cycle            0    1    2    3    4    5    6    7    8    9   10   11
+  issue read      w5   w6   w7   w0   w1   w2   w3   w4
+  word arrives                        w5   w6   w7   w0   w1   w2   w3   w4
+  load of w5                          ^ hits next cycle
+  stores may use port:                               ^ all 8 reads already issued
+
+  without EARLY_RESTART the reads are w0..w7 in order, and the load waits until
+  the whole line is valid (last word arrives in cycle 11).
 ```
 
-A refill issues 8 back-to-back word reads to `memory4c`, and the words return 4 cycles later:
-
-```text
-                       cycle:  0   1   2   3   4   5   6   7   8   9   10  11
-  reads issued (EARLY_RESTART): w5  w6  w7  w0  w1  w2  w3  w4                   <- critical word first
-  words arrive:                                 w5  w6  w7  w0  w1  w2  w3  w4
-  load waiting for w5:                          ^ w5 arrives; the load hits in the next cycle
-  without EARLY_RESTART:        w0 ... w7 in order; the load hits only after the line completes
-  stores may use the port:                                  ^ from here: all 8 reads issued
-```
+*Figure II.15 — Critical-word-first refill. The requester uses each word as soon as it arrives;
+stores share the port on the refill's tail.*
 
 | Feature | Parameter | Effect |
 |---|---|---|
@@ -799,24 +1005,32 @@ A refill issues 8 back-to-back word reads to `memory4c`, and the words return 4 
 
 ## III.1 Flow
 
+Two independent executions of the same program, then a line-by-line diff.
+
 ```text
-   tests/*.s, random programs                    tests/*.img (course images)
-            |                                              |
-            v                                              |
-     wisc.py assembler ---------------> program.img <------+
-                                             |
-                    +------------------------+------------------------+
-                    v                                                 v
-          wisc.py golden ISA simulator                     cpu_tb (Icarus or Verilator)
-          one instruction at a time                        RTL out-of-order core
-                    |                                                 |
-                    v                                                 v
-         expected commit trace + memory                  commit trace (from ROB commit port)
-                    |                                    + memory dump + STATS line
-                    +------------------> compare <--------------------+
-                                       line by line
-                          first mismatch reported with context
+  tests/*.s  or  random generator          course  tests/*.img
+              |                                      |
+              v                                      |
+        wisc.py asm  ------>  program.img  <---------+
+                                  |
+                 +----------------+----------------+
+                 |                                 |
+                 v                                 v
+        golden ISA simulator                 RTL testbench
+        (one instr at a time)                (OoO core)
+                 |                                 |
+                 v                                 v
+        expected trace + mem                 ROB commit trace
+                                             + mem dump + STATS
+                 |                                 |
+                 +-------- compare ----------------+
+                           |
+                           +-- match: pass, record IPC
+                           +-- first differing line: fail, print context
 ```
+
+*Figure III.1 — How a test is judged. Architectural state must match; cycle counts are collected
+but never used as a pass/fail check.*
 
 **Commit trace.** There is one line per retired instruction: `<pc> <instr> -`,
 `<pc> <instr> R<n>=<value>`, or `<pc> <instr> M[<addr>]=<value>`. The RTL and the golden model
@@ -904,7 +1118,8 @@ total instructions / total cycles, so the long benchmarks dominate it.
 ## IV.1 Five-stage vs out-of-order
 
 The out-of-order core here uses its default configuration. The five-stage core is timed with
-`ooo_core/tb/baseline_tb.v`, and its instruction counts come from the golden model.
+`ooo_core/tb/baseline_tb.v`, and its instruction counts come from the golden model. Read a row
+as "same program, two machines": the last column is OoO cycles divided into five-stage cycles.
 
 | Program | Instructions | 5-stage cycles | 5-stage IPC | OoO cycles | OoO IPC | Speedup |
 |---|---:|---:|---:|---:|---:|---:|
@@ -933,14 +1148,17 @@ aren't comparable. On those programs the out-of-order core reaches, for example:
 
 ## IV.2 Branch predictors and recovery point
 
-| Predictor | Conditional mispredict rate | Suite IPC, recover at commit | Suite IPC, recover at execute |
+Read left to right: a better predictor lowers the mispredict rate; recovering at execute (last
+column) always beats recovering at commit (column before it).
+
+| Predictor | Cond. mispredict | IPC, recover at commit | IPC, recover at execute |
 |---|---:|---:|---:|
 | static not-taken | 71.1% | 0.547 | 0.666 |
 | BTFN | 27.9% | 0.702 | 0.765 |
 | bimodal | 24.4% | 0.713 | 0.770 |
 | gshare | 27.7% | 0.699 | 0.765 |
 | tournament | 22.6% | 0.725 | 0.779 |
-| perceptron | 18.8% | 0.743 | 0.788 |
+| perceptron | 18.8% | 0.743 | **0.788** |
 | TAGE-lite | 19.0% | 0.740 | 0.786 |
 
 - History-based predictors learn the repeating patterns. On `bench_branch_patterns`, mispredicts
@@ -951,23 +1169,27 @@ aren't comparable. On those programs the out-of-order core reaches, for example:
 
 ## IV.3 Window sizes
 
-One structure is varied at a time; the others stay at the defaults.
+One structure is varied at a time; the others stay at the defaults (ROB 16, IQ 8, SQ 8).
+Read down a column: bigger is only useful if IPC actually moves.
 
-| Structure | Size → suite IPC |
-|---|---|
-| ROB | 4 → 0.783, 8 → 0.785, 16 → 0.786, 32 → 0.786 |
-| Issue queue | 2 → 0.785, 4 → 0.786, 8 → 0.786, 16 → 0.786 |
-| Store queue | 2 → 0.747, 4 → 0.782, 8 → 0.786, 16 → 0.790 |
+| Entries | ROB suite IPC | IQ suite IPC | SQ suite IPC |
+|---:|---:|---:|---:|
+| 2 | — | 0.785 | 0.747 |
+| 4 | 0.783 | 0.786 | 0.782 |
+| 8 | 0.785 | 0.786 | 0.786 |
+| 16 | 0.786 | 0.786 | 0.790 |
+| 32 | 0.786 | — | — |
 
 With one instruction dispatched per cycle, average ROB occupancy is about 3, so 16 entries is
-already plenty. The store queue matters most, because stores wait there until they drain
+already plenty. The store queue is the one that matters: stores wait there until they drain
 through the single memory port.
 
 ## IV.4 Memory-side optimizations
 
-These are total cycles over the suite, relative to all features off (14,929 cycles):
+These are total cycles over the suite, relative to all three features off (14,929 cycles).
+Each row is one configuration; the last column is the only number that matters for IPC.
 
-| Early restart | I prefetch | D prefetch | Cycles saved |
+| Early restart | I prefetch | D prefetch | Cycles saved vs all-off |
 |:---:|:---:|:---:|---:|
 | on | off | off | 9.7% |
 | off | on | off | 9.4% |
