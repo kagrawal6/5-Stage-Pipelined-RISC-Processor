@@ -4,6 +4,8 @@ This folder is the complete implementation of the **16-bit WISC-S25 five-stage p
 
 The top-level RTL module is `cpu` in `cpu.v`. The simulation harness is `cpu_ptb` in `project-phase3-testbench.v`.
 
+An out-of-order version of this processor lives in [`../ooo_core`](../ooo_core/README.md). It reuses the ALU arithmetic blocks (`Adder_ALU.v`, `Subtractor.v`, `XOR.v`, `RED.v`, `PSA_16bit.v`, `Shifter_ALU.v`, `Shifter.v`, `Rotater.v`, the CLA adders) and `memory4c.v` from this folder. Nothing here was changed for it except `memory4c.v`, which now accepts a `+IMG=<file>` plusarg.
+
 
 ## What this design does
 
@@ -37,7 +39,7 @@ project-phase3-testbench.v          cpu_ptb  — clock, reset, traces
                 ├── D_cache.v
                 ├── cache_memory_bridge.v
                 │       └── cache_miss_handler.v
-                └── memory4c.v      loads loadfile_testN.img
+                └── memory4c.v      loads +IMG=<file> (default loadfile_test4.img)
 ```
 
 
@@ -93,7 +95,7 @@ project-phase3-testbench.v          cpu_ptb  — clock, reset, traces
 | `decoder_3_8.v` | One-hot word select inside a 16-byte block |
 | `cache_memory_bridge.v` | Arbitrates simultaneous I-cache and D-cache misses onto one memory port |
 | `cache_miss_handler.v` | FSM that bursts a 16-byte line from main memory into the cache |
-| `memory4c.v` | Byte-addressable 16-bit main memory; 1-cycle write, 4-cycle read; `$readmemh` of the selected `.img` |
+| `memory4c.v` | Byte-addressable 16-bit main memory; 1-cycle write, 4-cycle read; loads the image named by `+IMG=<file>` (default `loadfile_test4.img`) |
 
 ### Testbench, programs, and traces
 
@@ -103,7 +105,7 @@ project-phase3-testbench.v          cpu_ptb  — clock, reset, traces
 | `loadfile_test1.img` | Hex program: LLB/LHB and ALU |
 | `loadfile_test2.img` | Hex program: LW/SW, PADDSB, RED |
 | `loadfile_test3.img` | Hex program: B, BR, PCS, HLT |
-| `loadfile_test4.img` | Hex program: longer loops and cache traffic (the image currently named in `memory4c.v`) |
+| `loadfile_test4.img` | Hex program: longer loops and cache traffic (loaded when no `+IMG` is given) |
 | `TEST1.plog` … `TEST4.plog` | Saved per-cycle logs from those four images |
 | `TEST1.ptrace` … `TEST4.ptrace` | Saved register/memory traces |
 | `verilogsim.plog` / `verilogsim.ptrace` | Output of the most recent simulation |

@@ -40,6 +40,7 @@ module memory4c (data_out, data_in, addr, enable, wr, clk, rst, data_valid);
 
    reg [15:0]      mem [0:2**ADDR_WIDTH-1];
    reg            loaded;
+   reg [8*256-1:0] img_file;
 
    assign         data_out_4 = (enable & (~wr))? {mem[addr[ADDR_WIDTH-1 :1]]}: 0; //Read
    assign	     data_valid_4 = (enable & (~wr));
@@ -48,9 +49,11 @@ module memory4c (data_out, data_in, addr, enable, wr, clk, rst, data_valid);
    end
    always @(posedge clk) begin
       if (rst) begin
-         //load loadfile_all.img
+         //load the image named by +IMG=<file>, or loadfile_test4.img by default
          if (!loaded) begin
-            $readmemh("loadfile_test4.img", mem);
+            if (!$value$plusargs("IMG=%s", img_file))
+               img_file = "loadfile_test4.img";
+            $readmemh(img_file, mem);
             loaded = 1;
          end
 

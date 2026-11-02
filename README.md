@@ -38,17 +38,44 @@ The top-level module is `cpu.v`.
 ```text
 .
 ├── README.md                           This file
-├── project_working_directory/          All RTL, tests, and simulator files
+├── project_working_directory/          Phase-3 five-stage pipeline: RTL, tests, simulator files
 │   └── README.md                       File map and design overview
+├── ooo_core/                           Out-of-order extension of the same processor
+│   ├── README.md                       Architecture, how to run, verification, results
+│   ├── rtl/  tb/  tests/  tools/       RTL, testbenches, test programs, Python tooling
+│   └── results/                        Experiment CSVs and SUMMARY.md
 ├── Project-Description.pdf             Official WISC-S25 ISA, pipeline, and cache spec
 ├── RISC_CPU_Block_Diagram.pdf          Datapath, pipeline, and cache diagram
 └── Final Project Report RISC V.pdf     Design explanation and validation results
 ```
 
-The processor source lives entirely in `project_working_directory/`. Start there to simulate the design; see that folder's README for a file-by-file map of the RTL.
+The five-stage processor lives in `project_working_directory/`; see that folder's README for a file-by-file map of the RTL. `ooo_core/` contains the out-of-order version described [below](#out-of-order-core-ooo_core).
 
 
-## How to Run
+## Out-of-Order Core (`ooo_core/`)
+
+The five-stage design was extended into a single-issue **out-of-order** core that runs the same WISC-S25 programs:
+
+- **Reorder buffer** (16 entries) with in-order commit, and **register renaming** of R1-R15 and the flags
+- **Unified issue queue** (8 entries) with wakeup/select feeding ALU, branch, load and store units
+- **Store queue** with store-to-load forwarding and in-order write-through at commit
+- **Branch prediction**: static, BTFN, bimodal, gshare, tournament, perceptron, or TAGE-lite, plus a BTB; mispredicts recover as soon as the branch executes
+- **Caches** with the phase-3 geometry, plus critical-word-first refills and next-line prefetching
+
+On the programs the five-stage core runs correctly, the out-of-order core is **1.60x faster** on average. Every configuration is verified instruction-by-instruction against a Python golden ISA simulator, using directed tests and thousands of random programs.
+
+Quick start (needs Icarus Verilog and Python 3):
+
+```bash
+cd ooo_core
+python3 tools/run_tests.py                     # all directed tests on the default core
+python3 tools/run_tests.py --bp all --er 0,1   # compare every branch predictor
+```
+
+See [`ooo_core/README.md`](ooo_core/README.md) for the microarchitecture, all options, and the results, and [`ooo_core/results/SUMMARY.md`](ooo_core/results/SUMMARY.md) for the full result tables.
+
+
+## How to Run (five-stage core)
 
 Simulation was developed and verified in **Questa / ModelSim** (QuestaSim 2023.2). The top-level DUT is `cpu` in `cpu.v`. The provided testbench is `cpu_ptb` in `project-phase3-testbench.v`.
 
@@ -61,20 +88,16 @@ If you do not have ModelSim, Icarus Verilog can compile the same sources (`iveri
 
 ### 2. Choose a test program
 
-Main memory is initialized from a hex image in `memory4c.v`. Change the `$readmemh` filename to select a program:
-
-```verilog
-$readmemh("loadfile_test1.img", mem);
-```
+Main memory is initialized from a hex image in `memory4c.v`. It loads `loadfile_test4.img` by default. To pick another image, pass `+IMG=<file>` on the simulator command line (for example `vsim ... +IMG=loadfile_test1.img`, or `vvp cpu_sim +IMG=loadfile_test1.img`).
 
 | Image | What it exercises | Saved result traces |
 | --- | --- | --- |
 | `loadfile_test1.img` | Immediate loads (LLB/LHB) and ALU ops | `TEST1.plog`, `TEST1.ptrace` |
 | `loadfile_test2.img` | LW/SW plus PADDSB and RED | `TEST2.plog`, `TEST2.ptrace` |
 | `loadfile_test3.img` | Branches (B, BR), PCS, and HLT | `TEST3.plog`, `TEST3.ptrace` |
-| `loadfile_test4.img` | Longer mix with loops and cache traffic *(currently selected)* | `TEST4.plog`, `TEST4.ptrace` |
+| `loadfile_test4.img` | Longer mix with loops and cache traffic *(default)* | `TEST4.plog`, `TEST4.ptrace` |
 
-Recompile `memory4c.v` after changing the image. The testbench does not take a plusarg for the image name.
+No recompilation is needed to switch images when you use `+IMG`.
 
 ### 3. Simulate with ModelSim / Questa (GUI)
 
@@ -105,7 +128,7 @@ vlog *.v
 vsim -c -voptargs=+acc work.cpu_ptb -do "run -all; quit -f"
 ```
 
-To re-run after switching the `.img` file, recompile `memory4c.v` and `restart` (GUI) or repeat `vlog` + `vsim` (command line).
+To run another image, repeat the `vsim` command with a different `+IMG=` argument.
 
 ### 5. Simulate with Icarus Verilog (optional)
 
