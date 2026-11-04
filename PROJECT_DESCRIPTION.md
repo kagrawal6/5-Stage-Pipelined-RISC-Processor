@@ -15,9 +15,9 @@ Both cores run the same WISC-S25 programs. A Python golden model checks the out-
 instruction by instruction. On the programs the five-stage core runs correctly, the out-of-order
 core is 1.60x faster (geometric mean).
 
-Diagrams are plain-text figures so they render on GitHub, in the editor, and in PDF exports.
-Each figure has a short caption that says what to look at, then the surrounding text walks
-through the same picture.
+High-level architecture uses **Mermaid** diagrams (rendered by GitHub). Detailed timing charts
+stay as plain text. Mermaid tips used here: node labels are quoted, and sequence-diagram
+messages avoid `:=` / bare `;` so GitHub's renderer does not fail.
 
 ## Contents
 
@@ -153,24 +153,21 @@ Source: `project_working_directory/`. Top level: `cpu.v`. Testbench: `cpu_ptb` i
 
 Walk left to right: one instruction occupies each box for one cycle, then moves to the next.
 
-```text
-          IF/ID              ID/EX              EX/MEM             MEM/WB
-            |                  |                  |                  |
-            v                  v                  v                  v
-  +--------+    +--------+    +--------+    +--------+    +--------+
-  |  IF    |--->|  ID    |--->|  EX    |--->|  MEM   |--->|  WB    |---> architectural
-  | fetch  |    | decode |    | execute|    | memory |    | write  |    state
-  | I-cache|    | RF read|    | ALU /  |    | D-cache|    | RF, ZNV|
-  | PC + 2 |    | branch |    | LLB/LHB|    | LW, SW |    | hlt    |
-  +--------+    +--------+    +--------+    +--------+    +--------+
-       ^             |              ^              ^            |
-       |             |              |              |            |
-       |        taken branch        |         store data        |
-       |        redirects PC        |         from WB           |
-       |        and flushes IF      |              |            |
-       +----------------------------+              |            |
-                                    forwarding     |            |
-                                    (next figure)  +------------+
+```mermaid
+flowchart LR
+    subgraph Pipeline["Five-stage pipeline"]
+        direction LR
+        IF["<b>IF</b><br/>Fetch<br/>I-cache<br/>PC + 2"]
+        ID["<b>ID</b><br/>Decode<br/>RF read<br/>Branch resolve"]
+        EX["<b>EX</b><br/>ALU / LLB/LHB<br/>Address gen"]
+        MEM["<b>MEM</b><br/>D-cache<br/>LW / SW"]
+        WB["<b>WB</b><br/>RF write<br/>Flags Z N V"]
+        IF --> ID --> EX --> MEM --> WB
+    end
+    WB --> ARCH["Architectural<br/>state"]
+    ID -.->|"taken branch:<br/>new PC + flush IF"| IF
+    WB -.->|"forwarding<br/>into EX / MEM"| EX
+    WB -.->|"RF / flag<br/>bypass"| ID
 ```
 
 *Figure I.1 — Five-stage pipeline. Branches are decided in ID (predict not-taken). A taken
@@ -227,20 +224,19 @@ flags and produces the next PC:
 The policy is predict not-taken. A taken branch resets the IF/ID register, which squashes the one
 instruction fetched behind it, and redirects the PC. A taken branch therefore costs one bubble.
 
-**EX.** Each ALU operand is chosen by a forwarding mux. Read this figure from the right: the
-newest result that writes the needed register wins.
+**EX.** Each ALU operand is chosen by a forwarding mux. Newest matching result wins.
 
-```text
-  sources for one ALU operand (priority: newest first)
-
-     EX/MEM result  ---- EX -> EX ----+
-     (instr that was in EX last cycle)|
-                                      v
-     MEM/WB result  ---- MEM -> EX -->+--> operand mux --> ALU / address add
-     (instr that was in MEM last cycle)
-                                      ^
-     value from ID/EX  ---------------+
-     (no hazard; use the RF read)
+```mermaid
+flowchart TB
+    EXMEM["EX/MEM result<br/>highest priority<br/>EX to EX"]
+    MEMWB["MEM/WB result<br/>MEM to EX"]
+    IDEX["ID/EX RF value<br/>no hazard"]
+    MUX{"Operand mux"}
+    ALU["ALU / address add"]
+    EXMEM --> MUX
+    MEMWB --> MUX
+    IDEX --> MUX
+    MUX --> ALU
 ```
 
 *Figure I.2 — Operand forwarding into EX. The same mux exists for both ALU inputs.*
@@ -344,32 +340,22 @@ missing.
 
 ## I.6 Memory hierarchy
 
-Two caches, one miss handler, one main-memory port. Follow a miss downward; follow a store-hit
-sideways.
+Two caches, one miss handler, one main-memory port.
 
-```text
-  IF: PC ------------------+                              +--> instruction --> ID
-                           v                              |
-                      +----------+                        |
-                      | I-cache  |-- hit -----------------+
-                      | 2 KB     |
-                      +----+-----+
-                           | miss
-                           v
-                      +----------+     +------------------+     +-------------+
-                      | bridge   |---->| miss handler     |---->| memory4c    |
-                      | I first, |     | 8-word burst     |     | 64K x 16    |
-                      | then D   |     | start of line    |     | 4-cycle rd  |
-                      +----+-----+     +------------------+     +------+------+
-                           | miss                                      ^
-                           v                                           | SW hit:
-                      +----------+                                     | write-through
-                      | D-cache  |-- hit: LW data --> MEM              |
-                      | 2 KB     |-- hit: SW data ---------------------+
-                      | WT, WA   |
-                      +----------+
-                           ^
-  MEM: addr, store data ---+
+```mermaid
+flowchart TB
+    PC["IF: PC"] --> IC["I-cache<br/>2 KB, 2-way"]
+    IC -->|"hit"| INSTR["instruction to ID"]
+    IC -->|"miss"| BRIDGE["cache_memory_bridge<br/>I-miss before D-miss"]
+    MEMIN["MEM: addr + store data"] --> DC["D-cache<br/>2 KB, 2-way<br/>write-through, write-allocate"]
+    DC -->|"LW hit"| LWOUT["load data to WB"]
+    DC -->|"SW hit"| WT["write-through"]
+    DC -->|"miss"| BRIDGE
+    BRIDGE --> CMH["cache_miss_handler<br/>8-word burst refill"]
+    CMH --> MEM4C["memory4c<br/>64K x 16<br/>4-cycle pipelined reads"]
+    WT --> MEM4C
+    CMH -->|"fill words"| IC
+    CMH -->|"fill words"| DC
 ```
 
 *Figure I.4 — Unified memory. Both caches miss through the same handler. A store that hits
@@ -493,48 +479,70 @@ Source: `ooo_core/rtl/`. Top level: `cpu.v`, with the same ports as the five-sta
 Six steps. Fetch, rename and commit are in-order and one-wide. Issue and execute are out of
 order, and up to four units can fire in the same cycle.
 
-```text
-  1. FETCH                2. RENAME               3. ISSUE
-  I-cache + predictor     decoder + map table     oldest ready instr
-  one instr / cycle       one instr / cycle       per FU class
-  into 4-entry IFQ        into ROB, IQ, SQ        (ALU, BRU, LDU, STU)
-         |                         |                       |
-         v                         v                       v
-  4. EXECUTE              5. WRITE-BACK           6. COMMIT
-  ALU / BRU / LDU / STU   CDB A: ALU + flags      ROB head, if done
-  one cycle each          CDB B: load value       writes ARF / flags
-         |                         |              trains predictor
-         |                         |              drains committed stores
-         +---- wakeup IQ ----------+
-         +---- mark ROB done ------+
-         +---- BRU may recover ----+
+```mermaid
+flowchart LR
+    F["1. FETCH<br/>I-cache + predictor<br/>IFQ 4"]
+    R["2. RENAME<br/>map table + ARF<br/>ROB / IQ / SQ"]
+    I["3. ISSUE<br/>oldest ready<br/>per FU class"]
+    E["4. EXECUTE<br/>ALU BRU LDU STU"]
+    W["5. WRITE-BACK<br/>CDB A / CDB B"]
+    C["6. COMMIT<br/>ROB head<br/>in order"]
+    F --> R --> I --> E --> W --> C
+    W -.->|"wakeup"| I
+    W -.->|"done bit"| C
+    E -.->|"mispredict<br/>recovery"| F
 ```
 
-*Figure II.1 — Instruction lifetime. Independent instructions can pass each other in step 3–4;
+*Figure II.1 — Instruction lifetime. Independent instructions can pass each other in steps 3–4;
 step 6 puts them back into program order.*
 
 Where those steps live in the RTL:
 
-```text
-  fetch_pc --> I-cache --> predictor --> IFQ --1/cycle--> decode / rename / dispatch
-     ^           |                                         |         |          |
-     |           | miss                                    |         |          | SW
-     |           v                                         v         v          v
-     |      mem_system                                  ROB(16)   IQ(8)      SQ(8)
-     |      + I/D $                                     commit       |          |
-     |                                                  ARF, map     |          |
-     |                                                       ^       v          v
-     |                                                       |    ALU  BRU   LDU  STU
-     |                                  recovery <-----------+     |    |     |    |
-     |                                  (squash younger)           |    |     |    |
-     +----- redirect PC, GHR --------------------------------------+    |     |    |
-                                                                        v     v    v
-                                                                     CDB A  CDB B  drain
-                                                                     (ALU)  (load) to D$
+```mermaid
+flowchart TB
+    subgraph FE["Front end"]
+        direction LR
+        PC["fetch_pc"] --> IC["I-cache"]
+        IC --> PRED["predictor + BTB"]
+        PRED --> IFQ["IFQ 4"]
+    end
+
+    IFQ --> DISP["Decode / Rename / Dispatch"]
+
+    DISP --> ROB["ROB 16<br/>ARF + map<br/>in-order commit"]
+    DISP --> IQ["Issue queue 8<br/>data capture"]
+    DISP --> SQ["Store queue 8"]
+
+    IQ --> ALU["ALU"]
+    IQ --> BRU["BRU"]
+    IQ --> LDU["LDU"]
+    IQ --> STU["STU"]
+
+    ALU --> CDBA["CDB A<br/>value + flags"]
+    LDU --> CDBB["CDB B<br/>load value"]
+    STU --> SQ
+    BRU -->|"mispredict"| REC["recovery"]
+    REC --> ROB
+    REC --> IQ
+    REC --> SQ
+    REC --> PC
+
+    CDBA --> IQ
+    CDBB --> IQ
+    CDBA --> ROB
+    CDBB --> ROB
+
+    ROB -->|"commit stores"| SQ
+    SQ -->|"drain"| DC["D-cache"]
+    IC -->|"miss"| MEMSYS["mem_system"]
+    DC -->|"miss"| MEMSYS
+    MEMSYS --> MAIN["memory4c"]
+    MEMSYS --> IC
+    MEMSYS --> DC
 ```
 
-*Figure II.2 — Block diagram. The left column is fetch and memory; the middle is rename and
-commit; the right is issue and execute.*
+*Figure II.2 — Block diagram. Front end on top, rename/commit in the middle, execute and memory
+on the sides. Recovery redirects fetch and squashes younger work.*
 
 ## II.3 Pipeline timing
 
@@ -569,23 +577,22 @@ Each cycle the front end does the following:
 1. **Read** the I-cache at `fetch_pc`. On a miss, it raises `i_miss_req` and fetches nothing.
 2. **Predecode** the instruction bits and choose the next PC in the same cycle:
 
-```text
-  fetched word
-       |
-       +-- HLT? ------------ yes --> stop fetching until a redirect
-       |
-       +-- B UNCOND? ------- yes --> next PC = PC+2+(imm9<<1)     always taken
-       |
-       +-- B cond? --------- yes --> direction predictor
-       |                                taken  --> PC+2+(imm9<<1)
-       |                                not    --> PC+2
-       |
-       +-- BR? ------------- yes --> direction predictor (if cond)
-       |                                and BTB hit?
-       |                                yes --> next PC = BTB target
-       |                                no  --> PC+2
-       |
-       +-- anything else --------------> PC+2
+```mermaid
+flowchart TB
+    W["Fetched instruction"]
+    W --> H{"HLT?"}
+    H -->|yes| STOP["Stop fetch until redirect"]
+    H -->|no| BU{"B UNCOND?"}
+    BU -->|yes| TGT["PC+2 + imm9<<1"]
+    BU -->|no| BC{"B conditional?"}
+    BC -->|yes| DIR1{"Direction<br/>predictor"}
+    DIR1 -->|taken| TGT
+    DIR1 -->|not taken| SEQ["PC + 2"]
+    BC -->|no| BR{"BR?"}
+    BR -->|yes| DIR2{"Taken and<br/>BTB hit?"}
+    DIR2 -->|yes| BTB["BTB target"]
+    DIR2 -->|no| SEQ
+    BR -->|no| SEQ
 ```
 
 *Figure II.4 — Next-PC decision in the fetch cycle. A correctly predicted taken `B` costs no
@@ -643,45 +650,46 @@ predictor:
 
 **Tournament** (Alpha 21264 style). Two experts, plus a chooser that learns which expert to trust:
 
-```text
-  PC, GHR --> gshare PHT [PC XOR GHR] ---- global guess --+
-                                                          |     chooser[GHR]
-  PC -------> local history[PC] --> local PHT             +--> picks one --> prediction
-                              local guess ----------------+
-
-  At commit: train both PHTs. If they disagreed, move the chooser toward the one that was right.
+```mermaid
+flowchart LR
+    PC["PC + GHR"] --> GS["gshare PHT"]
+    PC2["PC"] --> LHT["local history"] --> LPHT["local PHT"]
+    GHR["GHR"] --> CH["chooser"]
+    GS --> MUX{"pick"}
+    LPHT --> MUX
+    CH --> MUX
+    MUX --> OUT["prediction"]
 ```
 
-*Figure II.6 — Tournament predictor. The chooser is indexed by global history, not by PC.*
+*Figure II.6 — Tournament predictor. The chooser is indexed by global history, not by PC.
+At commit both PHTs train; if they disagreed, the chooser moves toward the winner.*
 
 **Perceptron** (Jiménez & Lin). One weight per recent branch, plus a bias:
 
-```text
-  y = w0 + (GHR[0] ? +w1 : -w1) + ... + (GHR[11] ? +w12 : -w12)
-
-  y >= 0  --> predict taken
-  y <  0  --> predict not-taken
-
-  Train at commit if the guess was wrong, or if |y| was smaller than theta (37):
-      bump w0 toward the outcome
-      bump w[i+1] up if GHR[i] matched the outcome, down otherwise
+```mermaid
+flowchart TB
+    PC["PC selects one of 32 perceptrons"] --> Y["y = w0 + sum over GHR bits"]
+    Y --> CMP{"y >= 0?"}
+    CMP -->|yes| T["predict taken"]
+    CMP -->|no| NT["predict not-taken"]
+    Y --> TRAIN["Train at commit if wrong<br/>or abs y less than theta 37"]
 ```
 
-*Figure II.7 — Perceptron. `PC[5:1]` selects which of 32 perceptrons to use.*
+*Figure II.7 — Perceptron. Weights bump toward the real outcome (saturating 8-bit).*
 
 **TAGE-lite** (Seznec). Longer history tables override shorter ones when their tag matches:
 
-```text
-  PC              --> base bimodal (512 x 2-bit)     always a guess
-  PC, GHR[3:0]    --> T1  128 entries, tag+counter+u    hit?
-  PC, GHR[7:0]    --> T2  128 entries                   hit?
-  PC, GHR[15:0]   --> T3  128 entries                   hit?
-
-  provider = the hitting table with the longest history (else the base)
-  alternate = the next-shorter hit (used to train the useful bit)
-
-  index = PC[7:1] XOR PC[14:8] XOR folded history
-  tag   = PC[8:1] XOR folded history (different fold)
+```mermaid
+flowchart TB
+    PC["PC"] --> BASE["base bimodal<br/>512 x 2-bit"]
+    H4["PC + GHR 4"] --> T1["T1 tagged 128"]
+    H8["PC + GHR 8"] --> T2["T2 tagged 128"]
+    H16["PC + GHR 16"] --> T3["T3 tagged 128"]
+    T3 --> PROV{"longest tag hit?"}
+    T2 --> PROV
+    T1 --> PROV
+    BASE --> PROV
+    PROV --> PRED["provider prediction"]
 ```
 
 *Figure II.8 — TAGE-lite lookup. Walk T3, T2, T1, then the base; the first tag match wins.*
@@ -734,19 +742,19 @@ for example the `PADDSB R0,R0,R0` NOP) is completed at dispatch and never occupi
 only Z, so a later branch on N doesn't have to wait for them.
 
 **Map table and operand read** (`rob.v`). Each of R1–R15, plus Z and NV, has a `busy` bit and the
-ROB tag of its youngest in-flight producer. For each source, walk this list top to bottom and
-stop at the first match:
+ROB tag of its youngest in-flight producer. For each source, walk top to bottom and stop at the
+first match:
 
-```text
-  source register (or Z / NV)
-           |
-           +-- R0, or map.busy = 0? ---- yes --> ARF value          ready
-           |
-           +-- producer ROB entry done?  yes --> ROB value          ready
-           |
-           +-- producer on CDB A or B?   yes --> CDB value          ready
-           |
-           +-- otherwise ----------------------> wait for that tag  not ready
+```mermaid
+flowchart TB
+    S["Source register or flag"]
+    S --> Q1{"R0 or map not busy?"}
+    Q1 -->|yes| ARF["ARF value - ready"]
+    Q1 -->|no| Q2{"Producer ROB done?"}
+    Q2 -->|yes| ROBV["ROB value - ready"]
+    Q2 -->|no| Q3{"On CDB A or B now?"}
+    Q3 -->|yes| CDBV["CDB value - ready"]
+    Q3 -->|no| WAIT["Wait for ROB tag"]
 ```
 
 *Figure II.9 — Operand lookup at dispatch. The destination's map entry is then pointed at the
@@ -809,19 +817,12 @@ operand values, not only tags. Each entry has:
 - four sources, `s1`, `s2`, `z` and `nv`, each with a `ready` bit, the producer `tag` and a
   captured `value`.
 
-```text
-  every cycle, for each IQ entry:
-
-    1. WAKEUP     CDB A (ALU value + Z,N,V)  --+--> if tag matches a waiting source,
-                  CDB B (load value)         --+    capture the value and set ready
-                                                (also used combinationally this cycle)
-
-    2. READY      all four sources ready (or arriving on a CDB now)
-                  and, if this is a load: LDU free and no older store still has an unknown address
-
-    3. SELECT     for ALU, for BRU, for LDU, for STU:
-                    among ready entries of that class, pick the smallest age
-                  up to four instructions issue; those IQ slots are freed
+```mermaid
+flowchart LR
+    CDB["CDB A / CDB B"] --> WU["1. Wakeup<br/>match tags<br/>capture values"]
+    WU --> RDY["2. Ready?<br/>all sources ready<br/>load rules"]
+    RDY --> SEL["3. Select<br/>oldest per FU"]
+    SEL --> FU["ALU / BRU / LDU / STU"]
 ```
 
 *Figure II.11 — Issue-queue cycle. Age is distance from the ROB head, so older work goes first.*
@@ -869,21 +870,17 @@ miss refills the line (write-allocate) and retries.*
 **Loads.** The IQ only issues a load once every older store has an address, so the load can
 compare against the queue safely:
 
-```text
-  load issues from IQ
-        |
-        v
-  older store to the same word? -- yes --> forward youngest match --+
-        | no                                                        |
-        v                                                           v
-  D-cache hit (including words     -- yes --> cache data -----------+--> CDB B next cycle
-  already written during a refill)
-        | no
-        v
-  hold in the pending-load register
-  request a refill; block younger loads
-        |
-        +---- retry when the missed word arrives
+```mermaid
+flowchart TB
+    LD["Load issues from IQ"]
+    LD --> SQQ{"Older store to<br/>same word?"}
+    SQQ -->|yes| FWD["Forward youngest match"]
+    SQQ -->|no| DCQ{"D-cache hit?<br/>incl. early-restart words"}
+    DCQ -->|yes| HIT["Cache data"]
+    DCQ -->|no| PEND["Pending-load register<br/>request refill<br/>block younger loads"]
+    PEND --> DCQ
+    FWD --> CDB["CDB B next cycle"]
+    HIT --> CDB
 ```
 
 *Figure II.13 — Load path. Forwarding uses the store queue; a miss occupies the load unit until
@@ -898,24 +895,22 @@ the line (or, with early restart, the missed word) is back.*
 
 ## II.11 Branch recovery
 
-`EARLY_RECOVERY = 1` (default) recovers in the cycle the BRU sees `actual next PC != predicted`.
-Everything listed here happens in that same cycle:
+`EARLY_RECOVERY = 1` (default) recovers in the cycle the BRU sees a wrong next PC. Everything
+below happens in that same cycle:
 
-```text
-  BRU:  mispredict
-    |
-    +--> ROB     rec_tag = branch tag
-    |            new tail = rec_tag + 1          (drop younger ROB entries)
-    |            rebuild map from surviving entries
-    |
-    +--> IQ      drop entries younger than the branch
-    |
-    +--> SQ      tail = the branch's saved sqp   (drop younger stores)
-    |
-    +--> fetch   PC  = actual next PC
-                 GHR = {snapshot from the branch, actual taken bit}
-                 clear the IFQ
-                 start correct-path fetch next cycle
+```mermaid
+sequenceDiagram
+    participant BRU
+    participant ROB
+    participant IQ
+    participant SQ
+    participant FE as Front end
+    BRU->>BRU: actual NPC differs from predicted
+    BRU->>ROB: set rec_tag, truncate tail, rebuild map
+    BRU->>IQ: squash younger entries
+    BRU->>SQ: restore SQ tail from branch snapshot
+    BRU->>FE: redirect PC and GHR, clear IFQ
+    Note over FE: correct-path fetch starts next cycle
 ```
 
 *Figure II.14 — Early recovery. Same actions with `EARLY_RECOVERY = 0`, but they wait until the
@@ -1007,26 +1002,19 @@ stores share the port on the refill's tail.*
 
 Two independent executions of the same program, then a line-by-line diff.
 
-```text
-  tests/*.s  or  random generator          course  tests/*.img
-              |                                      |
-              v                                      |
-        wisc.py asm  ------>  program.img  <---------+
-                                  |
-                 +----------------+----------------+
-                 |                                 |
-                 v                                 v
-        golden ISA simulator                 RTL testbench
-        (one instr at a time)                (OoO core)
-                 |                                 |
-                 v                                 v
-        expected trace + mem                 ROB commit trace
-                                             + mem dump + STATS
-                 |                                 |
-                 +-------- compare ----------------+
-                           |
-                           +-- match: pass, record IPC
-                           +-- first differing line: fail, print context
+```mermaid
+flowchart TB
+    SRC["tests/*.s or random generator"] --> ASM["wisc.py asm"]
+    IMG0["course *.img"] --> IMG["program.img"]
+    ASM --> IMG
+    IMG --> GOLD["Golden ISA simulator"]
+    IMG --> RTL["RTL testbench OoO core"]
+    GOLD --> EXP["expected commit trace + memory"]
+    RTL --> ACT["ROB commit trace + memory + STATS"]
+    EXP --> CMP{"Compare line by line"}
+    ACT --> CMP
+    CMP -->|match| PASS["Pass and record IPC"]
+    CMP -->|mismatch| FAIL["Fail with first differing line"]
 ```
 
 *Figure III.1 — How a test is judged. Architectural state must match; cycle counts are collected
@@ -1206,6 +1194,23 @@ Each row is one configuration; the last column is the only number that matters f
 ---
 
 # Part V — Side-by-side comparison
+
+```mermaid
+flowchart TB
+    subgraph InOrder["Five-stage in-order"]
+        direction LR
+        A1["IF"] --> A2["ID"] --> A3["EX"] --> A4["MEM"] --> A5["WB"]
+    end
+    subgraph OoO["Out-of-order"]
+        direction LR
+        B1["Fetch"] --> B2["Rename"] --> B3["Issue"] --> B4["Execute"] --> B5["Commit"]
+        B4 -.->|"recovery"| B1
+    end
+```
+
+Same ISA and top-level ports. Different internal scheduling: the five-stage core keeps
+instructions in lockstep; the OoO core lets ready work run early and restores program order
+at commit.
 
 | Aspect | Five-stage core | Out-of-order core |
 |---|---|---|

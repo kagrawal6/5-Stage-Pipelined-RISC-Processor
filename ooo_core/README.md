@@ -30,26 +30,38 @@ on the sorting and Fibonacci benchmarks.
 
 ## Microarchitecture
 
-```text
-             +---------------------------------- redirect (mispredict) -----------------------------+
-             v                                                                                      |
-  +---------------------+    +-------+    +---------------------+    +------------------+           |
-  | Fetch               |    |  IFQ  |    | Decode / Rename /   |    | Issue queue (8)  |           |
-  |  I-cache 2 KB 2-way |--->|  (4)  |--->| Dispatch            |--->| data-capture,    |           |
-  |  dir. predictor+BTB |    +-------+    |  map table (R1-R15, |    | oldest-first     |           |
-  |  speculative GHR    |                 |  Z, NV) + ARF       |    | select per FU    |           |
-  +---------------------+                 +---------------------+    +------------------+           |
-             ^                                 |          |            |     |     |     |          |
-             | refill                          v          v            v     v     v     v          |
-  +---------------------+               +-----------+ +--------+     ALU   BRU   LDU   STU ---------+
-  | mem_system          |               | ROB (16)  | | SQ (8) |      |           |     |
-  |  1 refill engine    |<--------------| in-order  | | store  |<-----+-----------+-----+
-  |  write-through path |   D refill /  | commit    | | queue  |      |           |
-  |  memory4c (4-cycle) |   store drain +-----------+ +--------+      v           v
-  +---------------------+                     ^                    CDB A (ALU)  CDB B (loads)
-             ^                                |                       |           |
-             +-------- D-cache 2 KB 2-way <---+---- wakeup / ROB write-back <-----+
+```mermaid
+flowchart TB
+    subgraph Frontend
+        direction LR
+        PC["fetch PC"] --> IC["I-cache 2 KB"]
+        IC --> BP["predictor + BTB"]
+        BP --> IFQ["IFQ 4"]
+    end
+
+    IFQ --> DISP["Decode / Rename / Dispatch"]
+    DISP --> ROB["ROB 16<br/>ARF + map table"]
+    DISP --> IQ["Issue queue 8"]
+    DISP --> SQ["Store queue 8"]
+
+    IQ --> ALU & BRU & LDU & STU
+    ALU --> CDBA["CDB A"]
+    LDU --> CDBB["CDB B"]
+    STU --> SQ
+    CDBA --> IQ
+    CDBB --> IQ
+    CDBA --> ROB
+    CDBB --> ROB
+    BRU -->|"mispredict"| PC
+    ROB -->|"commit"| SQ
+    SQ -->|"drain"| DC["D-cache 2 KB"]
+    IC -->|"miss"| MEM["mem_system"]
+    DC -->|"miss"| MEM
+    MEM --> MAIN["memory4c"]
 ```
+
+For the full walkthrough with stage timing, predictors, recovery, and results tables, see
+[`../PROJECT_DESCRIPTION.md`](../PROJECT_DESCRIPTION.md).
 
 An instruction goes through these steps:
 

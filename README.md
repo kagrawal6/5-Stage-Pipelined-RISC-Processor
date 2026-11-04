@@ -13,6 +13,12 @@ The processor supports the full **WISC-S25 instruction set**, including:
 
 The microarchitecture uses a **five-stage pipeline (IF, ID, EX, MEM, WB)** with:
 
+```mermaid
+flowchart LR
+    IF["IF"] --> ID["ID"] --> EX["EX"] --> MEM["MEM"] --> WB["WB"]
+    ID -.->|"taken branch"| IF
+```
+
 - **Data hazard handling** via stalling and register forwarding (EX→EX, MEM→EX, MEM→MEM)  
 - **Control hazard handling** using predict-not-taken branches and pipeline flushes  
 - **Branch resolution in the decode stage (ID)**  
@@ -57,6 +63,12 @@ The five-stage processor lives in `project_working_directory/`; see that folder'
 
 The five-stage design was extended into a single-issue **out-of-order** core that runs the same WISC-S25 programs:
 
+```mermaid
+flowchart LR
+    F["Fetch + IFQ"] --> R["Rename"] --> I["Issue"] --> E["Execute"] --> C["Commit"]
+    E -.->|"mispredict"| F
+```
+
 - **Reorder buffer** (16 entries) with in-order commit, and **register renaming** of R1-R15 and the flags
 - **Unified issue queue** (8 entries) with wakeup/select feeding ALU, branch, load and store units
 - **Store queue** with store-to-load forwarding and in-order write-through at commit
@@ -73,7 +85,7 @@ python3 tools/run_tests.py                     # all directed tests on the defau
 python3 tools/run_tests.py --bp all --er 0,1   # compare every branch predictor
 ```
 
-See [`ooo_core/README.md`](ooo_core/README.md) for the microarchitecture, all options, and the results, and [`ooo_core/results/SUMMARY.md`](ooo_core/results/SUMMARY.md) for the full result tables.
+See [`PROJECT_DESCRIPTION.md`](PROJECT_DESCRIPTION.md) for the full illustrated description of both cores, [`ooo_core/README.md`](ooo_core/README.md) for how to run and configure the OoO design, and [`ooo_core/results/SUMMARY.md`](ooo_core/results/SUMMARY.md) for the result tables.
 
 
 ## How to Run (five-stage core)

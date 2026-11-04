@@ -11,6 +11,16 @@ An out-of-order version of this processor lives in [`../ooo_core`](../ooo_core/R
 
 `cpu.v` wires a classic **IF → ID → EX → MEM → WB** pipeline around a 16-register file and a unified memory system.
 
+```mermaid
+flowchart LR
+    IF["IF<br/>I-cache<br/>PC + 2"] --> ID["ID<br/>decode<br/>RF read<br/>branch"]
+    ID --> EX["EX<br/>ALU<br/>address"]
+    EX --> MEM["MEM<br/>D-cache"]
+    MEM --> WB["WB<br/>RF + flags"]
+    ID -.->|"taken branch<br/>flush IF"| IF
+    WB -.->|"forward"| EX
+```
+
 **Fetch / decode.** The PC is updated in `pc_control.v`. Instructions come from the I-cache (`I_cache.v`). `controlsignal.v` decodes the 4-bit opcode into ALU op, memory enables, register-write, branch, PCS, and HLT controls. Branches are resolved in **ID** using the Z/N/V flags (predict not-taken; taken branches flush IF).
 
 **Execute.** `ALU.v` selects ADD, SUB, XOR, RED, SLL, SRA, ROR, or PADDSB. Address generation for LW/SW and the LLB/LHB read-modify-write path also happen here.
@@ -21,25 +31,25 @@ An out-of-order version of this processor lives in [`../ooo_core`](../ooo_core/R
 
 **Caches.** I-cache and D-cache are each **2 KB, 2-way set-associative, 16-byte blocks**. D-cache is **write-through, write-allocate**. Misses are filled by `cache_miss_handler.v` with burst reads from 4-cycle pipelined main memory (`memory4c.v`). `cache_memory_bridge.v` arbitrates when both caches miss.
 
+The thorough description of this pipeline (hazards, memory timing, comparison with the OoO core) is in [`../PROJECT_DESCRIPTION.md`](../PROJECT_DESCRIPTION.md).
+
 
 ## How the files fit together
 
-```text
-project-phase3-testbench.v          cpu_ptb  — clock, reset, traces
-        │
-        ▼
-     cpu.v                          pipeline + hazard + flag logic
-        ├── pc_control.v            next PC and branch conditions
-        ├── controlsignal.v         opcode → control signals
-        ├── register_file.v         16 × 16-bit registers
-        ├── ALU.v                   execute-stage operations
-        ├── EX_MEM_Register.v       EX/MEM pipeline register
-        └── unified_memory.v        I-cache + D-cache + main memory
-                ├── I_cache.v
-                ├── D_cache.v
-                ├── cache_memory_bridge.v
-                │       └── cache_miss_handler.v
-                └── memory4c.v      loads +IMG=<file> (default loadfile_test4.img)
+```mermaid
+flowchart TB
+    TB["project-phase3-testbench.v<br/>cpu_ptb"] --> CPU["cpu.v"]
+    CPU --> PC["pc_control.v"]
+    CPU --> CS["controlsignal.v"]
+    CPU --> RF["register_file.v"]
+    CPU --> ALU["ALU.v"]
+    CPU --> EXMEM["EX_MEM_Register.v"]
+    CPU --> UM["unified_memory.v"]
+    UM --> IC["I_cache.v"]
+    UM --> DC["D_cache.v"]
+    UM --> BR["cache_memory_bridge.v"]
+    BR --> CMH["cache_miss_handler.v"]
+    BR --> MEM["memory4c.v<br/>+IMG=file"]
 ```
 
 
